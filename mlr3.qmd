@@ -1,0 +1,308 @@
+---
+title: "mlr3"
+author: "Marvin Ludwig"
+format: html
+---
+
+
+## Questions beforehand
+
+In `caret`, if we want to use spatial data, we have to specifically exclude the geometry column of the `sf` object. We lose the spatial information in the process of model training and prediction. However, this information can be critical, e.g. if we want to use `CAST::errorprofiles` or `CAST::knncv`.  Is this also the case for `mlr3` and `tidymodels`?
+
+
+## Setup
+
+```{r installation}
+#| eval: false
+install.packages("mlr3verse")
+install.packages("mlr3spatial")
+install.packages("mlr3vis")
+
+install.packages("sf")
+install.packages("terra")
+```
+
+
+```{r other-packages}
+#| message: false
+#| warning: false
+
+library(sf)
+library(terra)
+```
+
+
+### Casestudy data
+
+```{r data}
+#| message: false
+#| warning: false
+
+
+covariates = terra::rast("data/predictors.tif")
+temperature = sf::read_sf("data/temp_train.gpkg")
+
+spain = sf::read_sf("data/spain.gpkg") |> st_cast("POLYGON") |> st_transform(st_crs(temperature))
+
+temperature = terra::extract(covariates, temperature, bind = TRUE) |> 
+  sf::st_as_sf()
+
+
+# the sf object cannot contain a column named "X" or "Y". Otherwise the task creation will fail because "Assertion on 'data' failed: Must have unique colnames"
+
+temperature$X = NULL
+temperature$Y = NULL
+```
+
+Terminology specific to the example data:
+
+- `spain` is the region outline - for visualization purposes and knndm setup
+- `covariates` are the spatially explicit data data to predict on (to prevent wording confusions with the predict function)
+- `temperature` are the measured temperature data (i.e. the response variable, i.e. the ground truth) along with the covariates at the measurement location
+
+
+
+### Official Documentation
+
+https://mlr-org.com/
+https://mlr3.mlr-org.com/
+https://mlr3spatiotempcv.mlr-org.com/articles/mlr3spatiotempcv.html
+
+
+```{r mlr3-essential}
+library(mlr3verse)
+library(mlr3spatial)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+lgr::get_logger("bbotk")$set_threshold("warn")
+```
+
+
+## First steps and observations
+
+`mlr3` uses `R6` classes. This might be not intuitive for a lot of R users
+
+Some terms you need to know when working with `mlr3`:
+
+- `tasks`
+- `learners`
+- `measures`
+
+
+
+`mlr3` implements a language. You have to know a lot of specific terminology in order to comfortably use the functions.
+
+learners = algorithms = method
+measures
+score
+
+The R6 class thing has a serious disadvantage in the comfort functions of Rstudio, e.g. no in-line popup help of available parameters of a model. You have to know and look up the parameters to set in the ranger function.
+
+Using frameworks has some disadvantages: num.trees vs. ntree
+
+
+### Initialization of mlr3 objects
+
+```{r mlr3-init}
+# Create a regression task with spatial data. "temp" is the target variable, i.e. the response
+
+
+# define a spatiotemporal task
+task_spain = mlr3spatial::as_task_regr_st(temperature,
+                                          target = "temp",
+                                          coordinate_names = "geometry",
+                                          coords_as_features = TRUE,
+                                          crs = st_crs(temperature))
+
+# define a data split stratetgy
+train_test_split = partition(task_spain, ratio = 0.7) # simple train test split
+
+# define the learner i.e. the modelling method
+rfmodel = lrn("regr.ranger", num.trees = 100, mtry = 4)
+
+# define the measurement with which the model gets evaluated
+measure_rmse = msr("regr.rmse")
+```
+
+
+The defined objects all contain specific methods (thats the `R6` logic) with which we can now train, predict and validate the temperature prediction.
+
+
+
+### Model training
+
+```{r mlr3-training}
+rfmodel$train(task_spain, row_ids = train_test_split$train)
+rfmodel$model
+```
+
+
+
+
+### Validation and Prediction
+
+
+```{r mlr3-prediction-tabular}
+# predicting on the left out test cases
+test_prediction = rfmodel$predict(task_spain, train_test_split$test)
+test_prediction$score(measure_rmse)
+```
+
+
+```{r mlr3-prediction-spatial}
+# predicting on the spatial raster:
+# The mlr3 R6 logic is then thrown out of the window with a function like this:
+prediction = mlr3spatial::predict_spatial(covariates, rfmodel)
+plot(prediction)
+```
+
+::: {.callout-note}
+Unfortunately, we have to use two different prediction functions for different predictor data formats.
+If you have tabular data like the left out test samples, you can keep the R6 logic and use `rfmodel$predict()`.
+If you have spatial raster data you need to use `mlr3spatial::predict_spatial()`.
+:::
+
+
+
+
+
+
+## Spatial cross-validation hyperparameter tuning
+
+### Define a strategy
+
+```{r spatial-cv}
+#| message: false
+library(mlr3spatiotempcv)
+
+
+resampling_blockcv = rsmp("spcv_block", folds = 5, range = 5000)
+
+
+# define a new learner, with specific possibilities of hyperparameters
+rfmodel = lrn("regr.ranger",
+              num.trees = 100,
+              mtry = to_tune(c(2,4,6,10,12)),
+              min.node.size = to_tune(c(5,10,15)))
+
+
+tuning_blockcv = ti(task = task_spain,
+                    resampling = resampling_blockcv,
+                    learner = rfmodel,
+                    measures = measure_rmse,
+                    terminator = trm("none"),
+                    store_benchmark_result = TRUE,
+                    store_models = TRUE)
+
+
+tuner_grid_search = mlr3tuning::tnr("grid_search")
+tuner_grid_search$optimize(tuning_blockcv)
+
+
+tuning_blockcv$archive$data
+
+```
+
+### Final model tuning with optimized hyperparameter
+
+```{r mlr3-finalmodel}
+
+tuned_rfmodel = lrn("regr.ranger")
+tuned_rfmodel$param_set$values = tuning_blockcv$result_learner_param_vals
+
+tuned_rfmodel$train(task_spain)
+
+tuned_prediction = predict_spatial(covariates, tuned_rfmodel)
+
+plot(tuned_prediction)
+
+```
+
+
+
+### knndm-cv
+
+```{r knndm}
+knndm_setup = rsmp("spcv_knndm", folds = 5, modeldomain = spain$geom[1,])
+knndm_setup
+
+# there is a bug here
+```
+
+
+
+## Feature Selection
+
+
+```{r ffs}
+#| eval: false
+
+library(mlr3fselect)
+library(mlr3filters)
+
+flt()
+select_mode = fs("sequential", min_features = )
+
+
+rfmodel_fs = lrn("regr.ranger",
+                 num.trees = 20,
+                 mtry = 2,
+                 min.node.size = 5)
+
+
+feature_selection = fselect(
+  fselector = select_mode,
+  task = task_spain,
+  learner = rfmodel_fs,
+  resampling = resampling_blockcv,
+  measure = measure_rmse
+  
+)
+
+
+
+instance = fselect(
+  fselector = fs("sequential"),
+  task =  tsk_pen,
+  learner = lrn_rpart,
+  resampling = rsmp("cv", folds = 3),
+  measure = msr("classif.acc")
+)
+
+
+```
+
+
+
+
+
+
+
+
+
+### Appendix
+
+
+- Data preprocessing and feature engineering
+- Model selection and specification
+- Hyperparameter tuning and feature selection
+- Spatial cross-validation
+- Model interpretation and visualization
+
+
+```{r appendix}
+#| message: false
+#| warning: false
+#| eval: false
+
+
+library(mlr3)
+
+
+library(mlr3misc)
+library(mlr3pipelines)
+library(mlr3tuning)
+library(mlr3inferr)
+```
+
+
