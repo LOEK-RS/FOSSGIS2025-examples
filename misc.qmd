@@ -1,0 +1,86 @@
+---
+title: "Misc"
+author: "Jakub Nowosad"
+format: html
+---
+
+```{r}
+#| message: false
+#| warning: false
+spain = sf::read_sf("data/spain.gpkg")
+covariates = terra::rast("data/predictors.tif")
+temperature = sf::read_sf("data/temp_train.gpkg")
+
+temperature = terra::extract(covariates, temperature, bind = TRUE) |> 
+  sf::st_as_sf()
+```
+
+# RandomForestsGLS
+
+```{r}
+library(RandomForestsGLS)
+```
+
+# spatialRF
+
+```{r}
+library(spatialRF)
+library(sf)
+
+# Prepare spatialRF data
+spatial_data = st_drop_geometry(temperature)
+distance_matrix = as.matrix(dist(spatial_data[2:(ncol(spatial_data))]))
+coordinates = st_coordinates(temperature)
+spatial_data$x = coordinates[, 1]
+spatial_data$y = coordinates[, 2]
+
+dependent.variable.name = "temp"
+predictor.variable.names = colnames(spatial_data)[2:(ncol(spatial_data) - 9)]
+
+# hengl method
+rf_spatial_hengl = rf_spatial(
+  data = spatial_data,
+  dependent.variable.name = dependent.variable.name,
+  predictor.variable.names = predictor.variable.names,
+  distance.matrix = distance_matrix,
+  distance.thresholds = 0,
+  method = "hengl",
+  n.cores = 1
+)
+print(rf_spatial_hengl)
+
+# mem.moran.sequential method
+rf_spatial_moran = rf_spatial(
+  data = spatial_data,
+  dependent.variable.name = dependent.variable.name,
+  predictor.variable.names = predictor.variable.names,
+  distance.matrix = distance_matrix,
+  distance.thresholds = 0,
+  method = "mem.moran.sequential",
+  n.cores = 1
+)
+print(rf_spatial_moran)
+
+# Fit an rf model first
+rf_model = rf(
+  data = spatial_data,
+  dependent.variable.name = dependent.variable.name,
+  predictor.variable.names = predictor.variable.names,
+  distance.matrix = distance_matrix,
+  distance.thresholds = 0,
+  n.cores = 1,
+  verbose = FALSE
+)
+
+# Convert rf model to spatial model
+rf_spatial_model = rf_spatial(model = rf_model)
+```
+
+
+# ENMeval
+
+# sperrorest
+
+# blockCV
+
+# sits
