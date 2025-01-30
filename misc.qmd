@@ -31,6 +31,7 @@ temperature_df = sf::st_drop_geometry(temperature)
 covariates = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
 covariate_matrix = as.matrix(temperature_df[, covariates])
 
+set.seed(2025-01-30)
 train_idx = 1:floor(nrow(coords) * 0.8)
 test_idx = (floor(nrow(coords) * 0.8) + 1):nrow(coords)
 
@@ -113,8 +114,100 @@ rf_spatial_model = rf_spatial(model = rf_model)
 
 # ENMeval
 
+<https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0-vignette.html>
+
+```{r}
+library(ENMeval)
+```
+
 # sperrorest
+
+```{r}
+library(sperrorest)
+library(rpart)
+
+dependent.variable.name = "temp"
+temperature_df = sf::st_drop_geometry(temperature)
+temperature_df$x = temperature_df$X
+temperature_df$y = temperature_df$Y
+covariates = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+
+fo = as.formula(paste(dependent.variable.name, "~", paste(covariates, collapse = " + ")))
+ctrl = rpart.control(cp = 0.005)
+
+mypred_part = function(object, newdata) {
+  predict(object, newdata)  # for regression
+}
+
+# Non-spatial cross-validation
+nsp_res = sperrorest(
+  data = temperature_df,
+  formula = fo,
+  model_fun = rpart,
+  model_args = list(control = ctrl),
+  pred_fun = mypred_part,
+  smp_fun = partition_cv,
+  smp_args = list(repetition = 1:2, nfold = 3),
+  progress = TRUE
+)
+summary(nsp_res$error_rep)
+summary(nsp_res$error_fold)
+
+# Spatial cross-validation
+sp_res = sperrorest(
+  data = temperature_df,
+  formula = fo,
+  model_fun = rpart,
+  model_args = list(control = ctrl),
+  pred_fun = mypred_part,
+  smp_fun = partition_kmeans,
+  smp_args = list(repetition = 1:2, nfold = 3),
+  progress = TRUE
+)
+summary(sp_res$error_rep)
+summary(sp_res$error_fold)
+
+library(ggplot2)
+
+# Extract train/test RMSE from non-spatial CV
+nsp_test_rmse = unlist(summary(nsp_res$error_rep, level = 1)$test_rmse)
+nsp_train_rmse = unlist(summary(nsp_res$error_rep, level = 1)$train_rmse)
+
+# Extract train/test RMSE from spatial CV
+sp_test_rmse = unlist(summary(sp_res$error_rep, level = 1)$test_rmse)
+sp_train_rmse = unlist(summary(sp_res$error_rep, level = 1)$train_rmse)
+
+# Build data frames
+nsp_df = data.frame(
+  CV_Type = "Non-Spatial",
+  Set = rep(c("Train", "Test"), each = length(nsp_train_rmse)),
+  RMSE = c(nsp_train_rmse, nsp_test_rmse)
+)
+sp_df = data.frame(
+  CV_Type = "Spatial",
+  Set = rep(c("Train", "Test"), each = length(sp_train_rmse)),
+  RMSE = c(sp_train_rmse, sp_test_rmse)
+)
+
+rmse_df = rbind(nsp_df, sp_df)
+
+# Boxplot: training vs testing, non-spatial vs spatial
+ggplot(rmse_df, aes(x = CV_Type, y = RMSE, fill = Set)) +
+  geom_boxplot(position = position_dodge(0.8)) +
+  theme_minimal() +
+  labs(title = "RMSE Comparison", x = "CV Method", y = "RMSE")
+```
 
 # blockCV
 
+<https://cran.r-project.org/web/packages/blockCV/vignettes/tutorial_2.html>
+
+```{r}
+library(blockCV)
+```
+
 # sits
+
+<https://github.com/e-sensing/sits>
+
+Out-of-scope
