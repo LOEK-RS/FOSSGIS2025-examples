@@ -18,7 +18,41 @@ temperature = terra::extract(covariates, temperature, bind = TRUE) |>
 # RandomForestsGLS
 
 ```{r}
+# library(RandomForestsGLS)
+# ?RFGLS_estimate_spatial #(for estimation in spatial data)
+# ?RFGLS_predict #(for prediction of mean function)
+# ?RFGLS_predict_spatial #(for prediction of Spatial Response)
 library(RandomForestsGLS)
+
+coords = sf::st_coordinates(temperature)
+temp_response = temperature$temp
+
+temperature_df = sf::st_drop_geometry(temperature)
+covariates = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+covariate_matrix = as.matrix(temperature_df[, covariates])
+
+train_idx = 1:floor(nrow(coords) * 0.8)
+test_idx = (floor(nrow(coords) * 0.8) + 1):nrow(coords)
+
+estimation_result = RFGLS_estimate_spatial(
+  coords = coords[train_idx, ],
+  y = temp_response[train_idx],
+  X = covariate_matrix[train_idx, ],
+  ntree = 50
+)
+
+prediction_result = RFGLS_predict(
+  RFGLS_out = estimation_result,
+  Xtest = covariate_matrix[test_idx, ]
+)
+
+prediction_result_spatial = RFGLS_predict_spatial(
+  RFGLS_out = estimation_result,
+  coords.0 = coords[test_idx, ],
+  Xtest = covariate_matrix[test_idx, ]
+)
+
+print(prediction_result)
 ```
 
 # spatialRF
