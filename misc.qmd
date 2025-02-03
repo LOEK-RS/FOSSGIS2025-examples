@@ -1,10 +1,25 @@
 ---
 title: "Misc"
 author: "Jakub Nowosad"
-format: html
+date: last-modified
+date-format: "[Last Updated:] MMMM, YYYY"
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+    fig-column: page
+    fig-width: 10 
+    fig-height: 6.5
+    embed-resources: true
+    toc: true
+knitr:
+  opts_chunk: 
+    warnings: false
+execute: 
+  warning: false
 ---
 
-```{r}
+```{r misc-1}
 #| message: false
 #| warning: false
 spain = sf::read_sf("data/spain.gpkg")
@@ -17,122 +32,232 @@ temperature = terra::extract(covariates, temperature, bind = TRUE) |>
 
 # RandomForestsGLS
 
-```{r}
-# library(RandomForestsGLS)
-# ?RFGLS_estimate_spatial #(for estimation in spatial data)
-# ?RFGLS_predict #(for prediction of mean function)
-# ?RFGLS_predict_spatial #(for prediction of Spatial Response)
+The **RandomForestsGLS** (<https://doi.org/10.21105/joss.03780>) package implements [the Generalised Least Square (GLS) based Random Forest (RF-GLS) algorithm](https://doi.org/10.1080/01621459.2021.1950003).^[Quoting the authors "RF-GLS extends RF in the same way generalized least squares (GLS) fundamentally extends ordinary
+least squares (OLS) to accommodate for dependence in linear models."]
+This approach is designed for spatial data modeling as it accounts for spatial dependencies in the data by:
+
+1. Using a global dependency-adjusted split criterion and node representatives instead of the classification and regression tree (CART) criterion used in standard RF models
+2. Applying contrast resampling rather than the bootstrap method used in a standard RF model
+3. Employing residual kriging with covariance modeled using a Gaussian process framework
+
+The package provides four functions:
+
+1. `RFGLS_estimate_spatial()` for estimation in spatial data
+2. `RFGLS_predict()` for prediction of the mean function
+3. `RFGLS_predict_spatial()` for prediction of the spatial response
+4. `RFGLS_estimate_timeseries()` for estimation in time series data (not discussed here)
+
+The package has rather unintuitive syntax and requires the data to be in a specific format. 
+We need to provide the coordinates of the data (a matrix), the response variable (a vector), and the covariates (a matrix).
+In the example below, I limited the covariate matrix to the variables that are not spatial proxies.
+
+```{r misc-2}
 library(RandomForestsGLS)
 
 coords = sf::st_coordinates(temperature)
 temp_response = temperature$temp
 
 temperature_df = sf::st_drop_geometry(temperature)
-covariates = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-covariate_matrix = as.matrix(temperature_df[, covariates])
+covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+covariate_matrix = as.matrix(temperature_df[, covariate_names])
+```
 
+For the example, we also split the data into training and testing sets based on created random indices.
+
+```{r}
 set.seed(2025-01-30)
-train_idx = 1:floor(nrow(coords) * 0.8)
-test_idx = (floor(nrow(coords) * 0.8) + 1):nrow(coords)
+train_idx = sample(1:nrow(coords), floor(nrow(coords) * 0.7))
+```
 
+The `RFGLS_estimate_spatial()` function is used to fit the RF-GLS model.
+Here, we customize the number of trees to 100, but the function has many other parameters that can be adjusted.
+
+```{r}
 estimation_result = RFGLS_estimate_spatial(
   coords = coords[train_idx, ],
   y = temp_response[train_idx],
   X = covariate_matrix[train_idx, ],
-  ntree = 50
+  ntree = 100
 )
+str(estimation_result)
+```
 
+The result is a list with seven elements: a matrix of zero-indexed resamples, a matrix of predictions (ntest x ntree), a vector of predicted values, the covariate matrix, the response variable, the coordinates matrix, and and the RF-GLS object.
+
+Now, we can use the fitted model to predict the mean function (`RFGLS_predict()`) or the spatial response (`RFGLS_predict_spatial()`).
+The difference (as long as I understand) is that the former returns the mean prediction, while the latter uses the spatial coordinates in addition to the covariates to predict the spatial response.
+
+The first function returns a list with two elements: a matrix of predictions (ntest x ntree) and a vector of predicted values, while the second function returns a list with just one element: a vector of predicted values.
+Just note that the predictions by the `RFGLS_predict()` are named `"predicted"` and the predictions by the `RFGLS_predict_spatial()` are named `"prediction"`.
+
+```{r}
+#| warnings: false
 prediction_result = RFGLS_predict(
   RFGLS_out = estimation_result,
-  Xtest = covariate_matrix[test_idx, ]
+  Xtest = covariate_matrix[-train_idx, ]
 )
-
 prediction_result_spatial = RFGLS_predict_spatial(
   RFGLS_out = estimation_result,
-  coords.0 = coords[test_idx, ],
-  Xtest = covariate_matrix[test_idx, ]
+  coords.0 = coords[-train_idx, ],
+  Xtest = covariate_matrix[-train_idx, ]
+)
+plot(prediction_result$predicted, prediction_result_spatial$prediction)
+```
+
+The final results of these two approaches are v. similar, but not identical.
+
+Now, let's predict the models' result on the whole dataset.
+
+```{r}
+covariate_coords_r = terra::crds(covariates)
+covariate_matrix_r = as.matrix(covariates)
+covariate_matrix_r = covariate_matrix_r[, covariate_names]
+
+pred_s = RFGLS_predict_spatial(
+  RFGLS_out = estimation_result,
+  coords.0 = covariate_coords_r,
+  Xtest = covariate_matrix_r
 )
 
-print(prediction_result)
+pred_r = terra::setValues(covariates[[1]], pred_s$prediction)
+names(pred_r) = "prediction"
+terra::plot(pred_r)
 ```
 
 # spatialRF
 
-```{r}
+The **spatialRF** (<https://blasbenito.github.io/spatialRF/>) package aim is to provide a minimal code interface to fit spatial regression models with Random Forest.
+The internal calculations are based on three general methods to generate spatial predictors from the distance matrix of the data points: Distance matrix columns as explanatory variables (Hengl et al. 2018), Moran’s Eigenvector Maps (Dray, Legendre, and Peres-Neto 2006) and PCAs.
+The **ranger** package is used here internally to fit the Random Forest model.
+
+This package also requires the data to be in a specific format.
+<!-- UPDATE!!!! -->
+We need to provide the data as a data frame with the dependent variable, including spatial coordinates, and the distance matrix: a matrix with the distances among the records in the data frame.
+
+```{r misc-3}
 library(spatialRF)
 library(sf)
 
-# Prepare spatialRF data
-spatial_data = st_drop_geometry(temperature)
-distance_matrix = as.matrix(dist(spatial_data[2:(ncol(spatial_data))]))
 coordinates = st_coordinates(temperature)
-spatial_data$x = coordinates[, 1]
-spatial_data$y = coordinates[, 2]
+colnames(coordinates) = c("x", "y")
+coordinates = as.data.frame(coordinates)
 
-dependent.variable.name = "temp"
-predictor.variable.names = colnames(spatial_data)[2:(ncol(spatial_data) - 9)]
+temperature_df = st_drop_geometry(temperature)
+temperature_df$x = coordinates[, 1]
+temperature_df$y = coordinates[, 2]
 
-# hengl method
-rf_spatial_hengl = rf_spatial(
-  data = spatial_data,
-  dependent.variable.name = dependent.variable.name,
-  predictor.variable.names = predictor.variable.names,
-  distance.matrix = distance_matrix,
-  distance.thresholds = 0,
-  method = "hengl",
-  n.cores = 1
-)
-print(rf_spatial_hengl)
+distance_matrix = as.matrix(dist(temperature_df[2:(ncol(temperature_df) - 9)]))
+```
 
-# mem.moran.sequential method
+We also need to define the dependent variable and the predictor variables.
+
+```{r}
+response_name = "temp"
+covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 9)]
+```
+
+Finally, we can fit the models using one of the methods provided by the package.
+The package has 10 methods implemented, nine of which are based on the three components:^[See `?rf_spatial` for more details. Also, the 10th method is `"hengl"` directly following the approach by Hengl et al. (2018).]
+
+1. The method to generate spatial predictors (`"hengl"`, `"mem"`, or `"pca"`)
+2. The method to rank spatial predictors (`"moran"`  or `"effect"`)
+3. The method to select spatial predictors (`"sequential"` or `"recursive"`)
+
+The main function of this package is `rf_spatial()`, which fits the Random Forest model with spatial predictors.
+Here, an example using the Moran's Eigenvector Maps method to generate spatial predictors, Moran's I to rank them, and sequential selection of the predictors is shown.
+```{r}
 rf_spatial_moran = rf_spatial(
-  data = spatial_data,
-  dependent.variable.name = dependent.variable.name,
-  predictor.variable.names = predictor.variable.names,
+  data = temperature_df,
+  dependent.variable.name = response_name,
+  predictor.variable.names = covariate_names,
   distance.matrix = distance_matrix,
   distance.thresholds = 0,
   method = "mem.moran.sequential",
   n.cores = 1
 )
-print(rf_spatial_moran)
-
-# Fit an rf model first
-rf_model = rf(
-  data = spatial_data,
-  dependent.variable.name = dependent.variable.name,
-  predictor.variable.names = predictor.variable.names,
-  distance.matrix = distance_matrix,
-  distance.thresholds = 0,
-  n.cores = 1,
-  verbose = FALSE
-)
-
-# Convert rf model to spatial model
-rf_spatial_model = rf_spatial(model = rf_model)
+rf_spatial_moran
 ```
 
+The `rf_spatial()` returns a **ranger** model with several new slows, most importantly `residuals` that various information about the residuals, and `spatial` that contains information about the selected spatial predictors and the method used to select them.
+Printing the model object provides a summary of the model, including its parameters, model performance, information on model residuals, and variable importance. 
 
-# ENMeval
-
-<https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0-vignette.html>
+The **spatialRF** package also provides a set of additional functions.
+It includes function for reducing multicollinearity in the predictors and removing redundant spatial predictors (`filter_spatial_predictors()`); or finding promising variable interactions (`the_feature_engineer()`):
 
 ```{r}
-library(ENMeval)
+interactions = the_feature_engineer(
+  data = temperature_df,
+  dependent.variable.name = response_name,
+  predictor.variable.names = covariate_names,
+  xy = coordinates,
+  importance.threshold = 0.50, #uses 50% best predictors
+  cor.threshold = 0.60, #max corr between interactions and predictors
+  seed = 2025-01-30,
+  repetitions = 100,
+  verbose = TRUE
+)
+```
+
+The `rf_evaluate()` function allows for evaluating the model using spatial cross-validation.
+
+```{r}
+rf_eval = rf_evaluate(
+  model = rf_spatial_moran,
+  xy = coordinates,
+  repetitions = 30,
+  training.fraction = 0.75,
+  metrics = "rmse", 
+  seed = 2025-01-30,
+  verbose = TRUE
+)
+rf_eval
+```
+
+The `rf_importance()` function allows for visualizing the variable importance of the model.
+```{r}
+rf_imp = rf_importance(
+  rf_spatial_moran,
+  xy = coordinates
+)
+rf_imp
+```
+
+The `mem()` function generates Moran Eigenvector Maps (MEM) from a distance matrix.^[`mem_multithreshold()` function allows for generating MEMs for multiple distance thresholds.]
+
+```{r}
+mem1 = mem(distance.matrix = distance_matrix)
+```
+
+The package also contains a set of custom plot functions. 
+One example is the `plot_response_curves()` function that allows for visualizing the response curves of the model.
+
+```{r}
+plot_response_curves(rf_spatial_moran)
+```
+
+Additional interesting functions allow for tuning the model parameters (`rf_tuning()`) or comparing several models (`rf_compare()`).
+A complete list of this package's functions is available at <https://blasbenito.github.io/spatialRF/reference/index.html>.
+
+The final prediction can be made using the `predict()` function from the **terra** package.
+
+```{r}
+pred_srf = terra::predict(covariates, rf_spatial_moran)
+terra::plot(pred_srf[[1]])
 ```
 
 # sperrorest
 
-```{r}
+```{r misc-4}
 library(sperrorest)
 library(rpart)
 
-dependent.variable.name = "temp"
+response_name = "temp"
 temperature_df = sf::st_drop_geometry(temperature)
 temperature_df$x = temperature_df$X
 temperature_df$y = temperature_df$Y
-covariates = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
 
-fo = as.formula(paste(dependent.variable.name, "~", paste(covariates, collapse = " + ")))
+fo = as.formula(paste(response_name, "~", paste(covariate_names, collapse = " + ")))
 ctrl = rpart.control(cp = 0.005)
 
 mypred_part = function(object, newdata) {
@@ -202,12 +327,111 @@ ggplot(rmse_df, aes(x = CV_Type, y = RMSE, fill = Set)) +
 
 <https://cran.r-project.org/web/packages/blockCV/vignettes/tutorial_2.html>
 
-```{r}
+```{r misc-5}
 library(blockCV)
 ```
+
+## Block cross-validation strategies
+
+```{r misc-6}
+sb1 = cv_spatial(x = temperature,
+                  k = 10, # number of folds
+                  size = 300000, # size of the blocks in metres
+                  selection = "random", # random blocks-to-fold
+                  iteration = 50, # find evenly dispersed folds
+                  progress = FALSE,
+                  biomod2 = TRUE)
+cv_plot(sb1, temperature)
+```
+
+```{r misc-7}
+sb3 = cv_spatial(x = temperature,
+                  k = 10,
+                  rows_cols = c(4, 6),
+                  hexagon = FALSE,
+                  selection = "systematic")
+cv_plot(sb3, temperature)
+```
+
+```{r misc-8}
+sb4 = cv_spatial(x = temperature,
+                  k = 10,
+                  size = 300000,
+                  hexagon = FALSE,
+                  selection = "checkerboard")
+cv_plot(sb4, temperature)
+```
+
+## Spatial and environmental clustering
+
+```{r misc-9}
+# spatial clustering
+set.seed(6)
+scv = cv_cluster(x = temperature,
+                  k = 10)
+cv_plot(scv, temperature)
+```
+
+```{r misc-10}
+# environmental clustering
+set.seed(6)
+ecv = cv_cluster(x = temperature,
+                  r = covariates,
+                  k = 5, 
+                  scale = TRUE)
+cv_plot(ecv, temperature)
+```
+
+## Buffering LOO (also known as Spatial LOO)
+
+```{r misc-11}
+bloo = cv_buffer(x = temperature,
+                  size = 300000, 
+                 progress = FALSE)
+cv_plot(bloo, temperature,
+        num_plots = c(1, 50, 100))
+```
+
+## Nearest Neighbour Distance Matching (NNDM) LOO
+
+```{r misc-12}
+nncv = cv_nndm(x = temperature,
+                r = covariates,
+                size = 300000,
+                num_sample = 5000, 
+                sampling = "regular",
+                min_train = 0.1,
+                plot = TRUE)
+cv_plot(nncv, temperature,
+        num_plots = c(1, 50, 100))
+```
+
+## Check similarity
+
+```{r misc-13}
+cv_similarity(cv = ecv, # the environmental clustering
+              x = temperature, 
+              r = covariates, 
+              progress = FALSE)
+```
+
+## Estimating size: the effective range of spatial autocorrelation
+
+```{r misc-14}
+sac1 = cv_spatial_autocor(r = covariates, 
+                           num_sample = 5000, 
+              progress = FALSE)
+```
+
+
+# ENMeval
+
+<https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0-vignette.html>
+
+Out-of-scope: a focus on the occurrence records (ecological niche models / species distribution models)
 
 # sits
 
 <https://github.com/e-sensing/sits>
 
-Out-of-scope
+Out-of-scope: a focus on spatiotemporal data cubes
