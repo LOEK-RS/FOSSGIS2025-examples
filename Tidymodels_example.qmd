@@ -1,0 +1,141 @@
+---
+title: "Spatial Machine Learning with Tidymodels"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+## Introduction
+
+
+
+## Prepare data
+
+
+```{r, results='hide', message=FALSE}
+library(terra)
+library(sf)
+library(tidymodels)
+library(ranger)
+library(dplyr)
+library(spatialsample)
+
+```
+
+Read data:
+```{r, results='hide', message=FALSE}
+trainingdata <- st_read("data/temp_train.gpkg")
+predictors <- rast("data/predictors.tif")
+```
+Prepare data:
+```{r, results='hide', message=FALSE}
+trainDat <- st_as_sf(terra::extract(predictors,trainingdata,bind=TRUE))
+predictor_names <- names(predictors)# Extract predictor names from the raster
+response_name <- "temp"
+```
+
+
+
+## A simple model training and prediction
+
+
+First, we train a random forest model.
+```{r}
+train_df <- st_drop_geometry(trainDat)
+
+# Define the recipe
+formula <- as.formula(paste(response_name, "~", paste(predictor_names, collapse = " + ")))
+recipe <- recipe(formula, data = train_df)
+
+rf_model <- rand_forest(trees = 100, mode = "regression",
+                        mtry = tune(),
+                        trees = 1000,
+                        min_n = tune()) %>%
+  set_engine("ranger")
+
+# Create the workflow
+workflow <- workflow() %>%
+  add_recipe(recipe) %>%
+  add_model(rf_model)
+
+# Fit the model
+rf_fit <- fit(workflow, data = train_df)
+```
+
+
+ Now let's use the model for spatial prediction
+```{r}
+
+# Convert raster to a data frame for prediction
+predictor_df <- as.data.frame(predictors, xy = TRUE, na.rm = TRUE)
+
+# Predict using the fitted model
+predictions <- predict(rf_fit, predictor_df)
+
+# Add predictions to the data frame
+predictor_df$predictions <- predictions$.pred
+
+# Convert predictions back to a raster
+prediction_raster <- rast(predictor_df, type = "xyz")$predictions
+```
+
+
+::: {.callout-note}
+tidymodels apparently doesn't support working with raster data (neither stars nor terra supported). Detours are required for spatial predictions.
+:::
+
+
+## Spatial cross-validation
+
+Define folds and the validation control
+```{r}
+random_folds <- vfold_cv(trainDat,v=4)
+block_folds <- spatial_block_cv(trainDat, v = 4,n=2)
+autoplot(block_folds)
+
+# control cross-validation
+keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
+```
+
+```{r}
+### Cross-validation
+rf_spatial <- fit_resamples(workflow, resamples=block_folds,control = keep_pred)
+rf_random <- fit_resamples(workflow, resamples=random_folds,control = keep_pred)
+
+### get CV metrics
+#rf_spatial$.metrics # metrics from each fold
+collect_metrics(rf_spatial)
+collect_metrics(rf_random)
+```
+
+```{r,echo=FALSE}
+### analyze CV predictions
+rf_spatial_pred <- data.frame(collect_predictions(rf_spatial),type="spatial")
+rf_random_pred <- data.frame(collect_predictions(rf_random),type="random")
+pred_cv <- rbind(rf_spatial_pred,rf_random_pred)
+pred_cv %>% 
+  ggplot(aes(x = temp, y = .pred)) + 
+  facet_wrap("type")+
+  geom_point(alpha = .15) +
+  geom_abline(color = "red") + 
+  coord_obs_pred() + 
+  ylab("Predicted")
+```
+
+
+::: {.callout-note}
+Similar to caret, we first define folds and a definition of train control.
+Cross-validation via fit_resamples.
+The final model, however, is still stored in workflow.
+:::
+
+## Model tuning: spatial hyperparameter tuning and variable selection
+```{r}
+
+
+```
+
+
+
+## Area of Applicability, Uncertainties etc
