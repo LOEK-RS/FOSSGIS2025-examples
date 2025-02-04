@@ -247,81 +247,114 @@ terra::plot(pred_srf[[1]])
 
 # sperrorest
 
+The **sperrorest** (<https://doi.org/10.32614/CRAN.package.sperrorest>) package is designed for spatial error estimation and variable importance assessment for predictive models.
+The package itself does not fit the models but provides a set of functions for spatial cross-validation, including data partitioning and model cross-validation.
+
+While the **sperrorest** package has many functions (including a set of functions for data partitioning), its main function is `sperrorest()`.
+It performs spatial cross-validation for spatial prediction models, including variable importance assessment and prediction error estimation.
+To use this function, we need to provide the formula, the data, the coordinates, the model function, the model arguments, the prediction function, the sampling function, and the sampling arguments.
+
+Let's do it step by step.
+First, we need to prepare the data by extracting the coordinates and creating a data frame with the dependent variable, covariates, and coordinates.
+
 ```{r misc-4}
 library(sperrorest)
-library(rpart)
+library(ranger)
 
-response_name = "temp"
+coordinates = sf::st_coordinates(temperature)
 temperature_df = sf::st_drop_geometry(temperature)
-temperature_df$x = temperature_df$X
-temperature_df$y = temperature_df$Y
+temperature_df$x = coordinates[, 1]
+temperature_df$y = coordinates[, 2]
+```
+
+Second, we need to define the formula for the model and the prediction function.
+
+```{r}
+response_name = "temp"
 covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-
 fo = as.formula(paste(response_name, "~", paste(covariate_names, collapse = " + ")))
-ctrl = rpart.control(cp = 0.005)
+```
 
-mypred_part = function(object, newdata) {
-  predict(object, newdata)  # for regression
+Third, we need to define the custom prediction function.
+The **sperrorest** package works with many model functions, but it requires a custom prediction function to extract the predictions from the model object.
+In this example, we use the `ranger` model, so we need to define a custom prediction function that extracts the predictions from the `ranger` model object.
+The `predict()` function from the `ranger` package returns a list with several elements, so we need to extract the predictions from this list.^[More information on the custom prediction functions is at <https://cran.r-project.org/web/packages/sperrorest/vignettes/custom-pred-and-model-functions.html>.]
+
+```{r}
+mypred = function(object, newdata) {
+  predict(object, newdata)$predictions
 }
+```
 
-# Non-spatial cross-validation
-nsp_res = sperrorest(
-  data = temperature_df,
-  formula = fo,
-  model_fun = rpart,
-  model_args = list(control = ctrl),
-  pred_fun = mypred_part,
-  smp_fun = partition_cv,
-  smp_args = list(repetition = 1:2, nfold = 3),
-  progress = TRUE
-)
-summary(nsp_res$error_rep)
-summary(nsp_res$error_fold)
+Forth, we can perform the spatial cross-validation using the `sperrorest()` function.
+We just need to provide previously prepared data, the formula, the model function, and the prediction function.
+Moreover, we can also define some additional parameters of the model, such as the number of trees in the `ranger` model.
+Finally, the important part is to define the sampling function (`smp_fun`) and its arguments (`smp_args`).
+The sampling function is used to partition the data into training and testing sets: here we use the `partition_kmeans()` function to partition the data spatially into folds using k-means clustering of the coordinates.^[There are several other partition functions available in the package, including `partition_disc()`, `partition_tiles()`, and  `partition_cv()`.]
 
+```{r}
 # Spatial cross-validation
 sp_res = sperrorest(
-  data = temperature_df,
   formula = fo,
-  model_fun = rpart,
-  model_args = list(control = ctrl),
-  pred_fun = mypred_part,
+  data = temperature_df,
+  coords = c("x", "y"),
+  model_fun = ranger,
+  model_args = list(num.trees = 100),
+  pred_fun = mypred,
   smp_fun = partition_kmeans,
   smp_args = list(repetition = 1:2, nfold = 3),
-  progress = TRUE
+  progress = FALSE
 )
+```
+
+The result is a list with several components, including the error at the repetition and fold levels, the resampling object, the variable importance (only when `importance = TRUE`), the benchmark, and the package version.
+
+```{r}
 summary(sp_res$error_rep)
-summary(sp_res$error_fold)
+```
 
+We can contrast the obtained results with the non-spatial cross-validation by changing the sampling function to `partition_cv()`.
+
+```{r}
+# Non-spatial cross-validation
+nsp_res = sperrorest(
+  formula = fo,
+  data = temperature_df,
+  coords = c("x", "y"),
+  model_fun = ranger,
+  model_args = list(num.trees = 100),
+  pred_fun = mypred,
+  smp_fun = partition_cv,
+  smp_args = list(repetition = 1:2, nfold = 3),
+  progress = FALSE
+)
+```
+
+To compare both results, we can plot the RMSE values for the training and testing sets of both spatial and non-spatial cross-validation.
+
+```{r}
 library(ggplot2)
-
-# Extract train/test RMSE from non-spatial CV
-nsp_test_rmse = unlist(summary(nsp_res$error_rep, level = 1)$test_rmse)
-nsp_train_rmse = unlist(summary(nsp_res$error_rep, level = 1)$train_rmse)
-
 # Extract train/test RMSE from spatial CV
-sp_test_rmse = unlist(summary(sp_res$error_rep, level = 1)$test_rmse)
-sp_train_rmse = unlist(summary(sp_res$error_rep, level = 1)$train_rmse)
-
-# Build data frames
-nsp_df = data.frame(
-  CV_Type = "Non-Spatial",
-  Set = rep(c("Train", "Test"), each = length(nsp_train_rmse)),
-  RMSE = c(nsp_train_rmse, nsp_test_rmse)
+sp_train_rmse = sp_res$error_rep$train_rmse
+sp_test_rmse = sp_res$error_rep$test_rmse
+# Extract train/test RMSE from non-spatial CV
+nsp_train_rmse = nsp_res$error_rep$train_rmse
+nsp_test_rmse = nsp_res$error_rep$test_rmse
+# Build data frame
+rmse_df = data.frame(
+  CV_Type = rep(c("Spatial", "Non-Spatial"), each = 4),
+  Set = rep(c("Train", "Test"), each = 2),
+  RMSE = c(sp_train_rmse, sp_test_rmse, nsp_train_rmse, nsp_test_rmse)
 )
-sp_df = data.frame(
-  CV_Type = "Spatial",
-  Set = rep(c("Train", "Test"), each = length(sp_train_rmse)),
-  RMSE = c(sp_train_rmse, sp_test_rmse)
-)
-
-rmse_df = rbind(nsp_df, sp_df)
-
-# Boxplot: training vs testing, non-spatial vs spatial
 ggplot(rmse_df, aes(x = CV_Type, y = RMSE, fill = Set)) +
-  geom_boxplot(position = position_dodge(0.8)) +
-  theme_minimal() +
+  geom_boxplot() +
+  facet_wrap(~Set) +
   labs(title = "RMSE Comparison", x = "CV Method", y = "RMSE")
 ```
+
+The results show that the estimation using the spatial-cross validation is less optimistic than the non-spatial cross-validation for the test set.
+
+More examples of the package use can be found at <https://giscience-fsu.github.io/sperrorest/articles/spatial-modeling-use-case.html>/
 
 # blockCV
 
