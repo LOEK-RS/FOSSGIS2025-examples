@@ -7,11 +7,13 @@ format:
   html:
     code-fold: true
     code-summary: "Show the code"
+    code-tools: true
     fig-column: page
     fig-width: 10 
     fig-height: 6.5
     embed-resources: true
     toc: true
+    number-sections: true
 knitr:
   opts_chunk: 
     warnings: false
@@ -82,10 +84,10 @@ estimation_result = RFGLS_estimate_spatial(
 str(estimation_result)
 ```
 
-The result is a list with seven elements: a matrix of zero-indexed resamples, a matrix of predictions (ntest x ntree), a vector of predicted values, the covariate matrix, the response variable, the coordinates matrix, and and the RF-GLS object.
+The result is a list with seven elements: a matrix of zero-indexed resamples, a matrix of predictions (ntest x ntree), a vector of predicted values, the covariate matrix, the response variable, the coordinates matrix, and the RF-GLS object.
 
 Now, we can use the fitted model to predict the mean function (`RFGLS_predict()`) or the spatial response (`RFGLS_predict_spatial()`).
-The difference (as long as I understand) is that the former returns the mean prediction, while the latter uses the spatial coordinates in addition to the covariates to predict the spatial response.
+The difference (as far as I understand) is that the former returns the mean prediction, while the latter uses the spatial coordinates in addition to the covariates to predict the spatial response.
 
 The first function returns a list with two elements: a matrix of predictions (ntest x ntree) and a vector of predicted values, while the second function returns a list with just one element: a vector of predicted values.
 Just note that the predictions by the `RFGLS_predict()` are named `"predicted"` and the predictions by the `RFGLS_predict_spatial()` are named `"prediction"`.
@@ -106,7 +108,7 @@ plot(prediction_result$predicted, prediction_result_spatial$prediction)
 
 The final results of these two approaches are v. similar, but not identical.
 
-Now, let's predict the models' result on the whole dataset.
+Now, let's predict the models' results on the whole dataset.
 
 ```{r misc-6}
 covariate_coords_r = terra::crds(covariates)
@@ -126,7 +128,7 @@ terra::plot(pred_r)
 
 # spatialRF
 
-The **spatialRF** (<https://blasbenito.github.io/spatialRF/>) package aim is to provide a minimal code interface to fit spatial regression models with Random Forest.
+The **spatialRF** (<https://blasbenito.github.io/spatialRF/>) package's aim is to provide a minimal code interface to fit spatial regression models with Random Forest.
 The internal calculations are based on three general methods to generate spatial predictors from the distance matrix of the data points: Distance matrix columns as explanatory variables (Hengl et al. 2018), Moran’s Eigenvector Maps (Dray, Legendre, and Peres-Neto 2006) and PCAs.
 The **ranger** package is used here internally to fit the Random Forest model.
 
@@ -160,11 +162,11 @@ Finally, we can fit the models using one of the methods provided by the package.
 The package has 10 methods implemented, nine of which are based on the three components:^[See `?rf_spatial` for more details. Also, the 10th method is `"hengl"` directly following the approach by Hengl et al. (2018).]
 
 1. The method to generate spatial predictors (`"hengl"`, `"mem"`, or `"pca"`)
-2. The method to rank spatial predictors (`"moran"`  or `"effect"`)
+2. The method to rank spatial predictors (`"moran"` or `"effect"`)
 3. The method to select spatial predictors (`"sequential"` or `"recursive"`)
 
 The main function of this package is `rf_spatial()`, which fits the Random Forest model with spatial predictors.
-Here, an example using the Moran's Eigenvector Maps method to generate spatial predictors, Moran's I to rank them, and sequential selection of the predictors is shown.
+Here, an example using Moran's Eigenvector Maps method to generate spatial predictors, Moran's I to rank them, and sequential selection of the predictors is shown.
 ```{r misc-9}
 rf_spatial_moran = rf_spatial(
   data = temperature_df,
@@ -178,11 +180,11 @@ rf_spatial_moran = rf_spatial(
 rf_spatial_moran
 ```
 
-The `rf_spatial()` returns a **ranger** model with several new slows, most importantly `residuals` that various information about the residuals, and `spatial` that contains information about the selected spatial predictors and the method used to select them.
+The `rf_spatial()` returns a **ranger** model with several new slows, most importantly `residuals` that contain information about the residuals, and `spatial` that contains information about the selected spatial predictors and the method used to select them.
 Printing the model object provides a summary of the model, including its parameters, model performance, information on model residuals, and variable importance. 
 
 The **spatialRF** package also provides a set of additional functions.
-It includes function for reducing multicollinearity in the predictors and removing redundant spatial predictors (`filter_spatial_predictors()`); or finding promising variable interactions (`the_feature_engineer()`):
+It includes a function for reducing multicollinearity in the predictors and removing redundant spatial predictors (`filter_spatial_predictors()`); or finding promising variable interactions (`the_feature_engineer()`):
 
 ```{r misc-10}
 interactions = the_feature_engineer(
@@ -198,7 +200,7 @@ interactions = the_feature_engineer(
 )
 ```
 
-The `rf_evaluate()` function allows for evaluating the model using spatial cross-validation.
+The `rf_evaluate()` function allows the evaluation of the model using spatial cross-validation.
 
 ```{r misc-11}
 rf_eval = rf_evaluate(
@@ -216,7 +218,7 @@ rf_eval
 The `rf_importance()` function allows for visualizing the variable importance of the model.
 ```{r misc-12}
 rf_imp = rf_importance(
-  rf_spatial_moran,
+ rf_spatial_moran,
   xy = coordinates
 )
 rf_imp
@@ -229,7 +231,7 @@ mem1 = mem(distance.matrix = distance_matrix)
 ```
 
 The package also contains a set of custom plot functions. 
-One example is the `plot_response_curves()` function that allows for visualizing the response curves of the model.
+One example is the `plot_response_curves()` function, which allows for the visualization of the response curves of the model.
 
 ```{r misc-14}
 plot_response_curves(rf_spatial_moran)
@@ -286,11 +288,11 @@ mypred = function(object, newdata) {
 }
 ```
 
-Forth, we can perform the spatial cross-validation using the `sperrorest()` function.
+Fourth, we can perform the spatial cross-validation using the `sperrorest()` function.
 We just need to provide previously prepared data, the formula, the model function, and the prediction function.
 Moreover, we can also define some additional parameters of the model, such as the number of trees in the `ranger` model.
 Finally, the important part is to define the sampling function (`smp_fun`) and its arguments (`smp_args`).
-The sampling function is used to partition the data into training and testing sets: here we use the `partition_kmeans()` function to partition the data spatially into folds using k-means clustering of the coordinates.^[There are several other partition functions available in the package, including `partition_disc()`, `partition_tiles()`, and  `partition_cv()`.]
+The sampling function is used to partition the data into training and testing sets: here, we use the `partition_kmeans()` function to partition the data spatially into folds using k-means clustering of the coordinates.^[There are several other partition functions available in the package, including `partition_disc()`, `partition_tiles()`, and  `partition_cv()`.]
 
 ```{r misc-19}
 # Spatial cross-validation
@@ -374,7 +376,7 @@ It assigns blocks to the training and testing folds randomly, systematically or 
 ```{r misc-24 }
 sb1 = cv_spatial(x = temperature,
                   k = 10, # number of folds
-                  size = 300000, # size of the blocks in metres
+                  size = 300000, # size of the blocks in meters
                   selection = "random", # random blocks-to-fold
                   iteration = 50, # find evenly dispersed folds
                   progress = FALSE,
@@ -388,7 +390,7 @@ For example, we can check the structure of the folds list with the `str()` funct
 str(sb1$folds_list)
 ```
 
-The `cv_plot()` function additionally allows for visualizing the cross-validation results.
+The `cv_plot()` function additionally allows for the visualization of cross-validation results.
 
 ```{r misc-26}
 cv_plot(sb1, temperature)
@@ -415,7 +417,7 @@ cv_plot(sb3, temperature)
 ```
 
 The clustering strategies (`cv_cluster()`) are used to group the data into clusters based on spatial or environmental similarity.
-The spatial similarity is based on the clustering of the spatial coordinates only. 
+The spatial similarity is based only on the clustering of the spatial coordinates. 
 
 ```{r misc-29 }
 set.seed(6)
@@ -439,10 +441,10 @@ bloo = cv_buffer(x = temperature, size = 300000, progress = FALSE)
 cv_plot(bloo, temperature, num_plots = c(1, 50, 100))
 ```
 
-Note that above we plot only the first, 50th, and 100th points to avoid overplotting.
+Note that above, we plot only the first, 50th, and 100th points to avoid overplotting.
 
-The last cross-validation strategy implemented in the **blockCV** package is Nearest Neighbour Distance Matching (NNDM) LOO.
-It is performed using the `cv_nndm()` function, which tries to match the nearest neighbour distance distribution function between the test and training data to the nearest neighbour distance distribution function between the target prediction and training points.
+The last cross-validation strategy implemented in the **blockCV** package is the Nearest Neighbour Distance Matching (NNDM) LOO.
+It is performed using the `cv_nndm()` function, which tries to match the nearest neighbor distance distribution function between the test and training data to the nearest neighbor distance distribution function between the target prediction and training points.
 Thus, in this base, we need to provide more arguments, including a raster with the covariates, the number of samples, the sampling strategy, and the minimum training size.
 
 ```{r misc-32 }
@@ -474,7 +476,7 @@ for(k in seq_along(folds)){
   testSet = unlist(folds[[k]][2]) # testing set indices; second element
   rf = ranger(fo, temperature_df[trainSet, ], num.trees = 100) # model fitting on training set
   pred = predict(rf, temperature_df[testSet, ])$predictions # predict the test set
-  model_rmse[k, "rmse"] = sqrt(mean((temperature_df[testSet, response_name] - pred)^2)) # calculate RMSE
+ model_rmse[k, "rmse"] = sqrt(mean((temperature_df[testSet, response_name] - pred)^2)) # calculate RMSE
 }
 model_rmse
 ```
@@ -498,7 +500,7 @@ More examples of the package's use can be found at <https://cran.r-project.org/w
 
 <https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0-vignette.html>
 
-Out-of-scope: a focus on the occurrence records (ecological niche models / species distribution models)
+Out-of-scope: a focus on the occurrence records (ecological niche models/species distribution models)
 
 # sits
 
