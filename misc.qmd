@@ -507,3 +507,131 @@ Out-of-scope: a focus on the occurrence records (ecological niche models/species
 <https://github.com/e-sensing/sits>
 
 Out-of-scope: a focus on spatiotemporal data cubes
+
+# meteo
+
+Random Forest Spatial Interpolation (RFSI, Sekulić et al. (2020) <doi:10.3390/rs12101687>) is implemented in the **meteo** package.
+RFSI enhances traditional Random Forest by explicitly incorporating spatial autocorrelation through additional covariates. 
+These covariates include (1) observations from the nn nearest locations and (2) their respective distances to the target location. 
+Predictions follow the same principle, using the nearest observed values and distances to improve spatial accuracy.
+
+```{r}
+library(meteo)
+```
+
+This package allows to directly work with spatial R objects.
+First, we need to define our formula.
+
+```{r}
+response_name = "temp"
+covariate_names = colnames(temperature)[2:(ncol(temperature) - 8)]
+fo = as.formula(paste(response_name, "~", paste(covariate_names, collapse = " + ")))
+```
+
+Next, we use the main function in this package, `rfsi()`, to fit the RFSI model.
+The function requires the formula, the data, and the number of nearest observations used in the model.
+Additional arguments can be set, including the number of CPUs to use, the progress bar, and arguments passed to the **ranger** function, such as `seed`, `num.trees`, and `mtry`.
+
+```{r}
+rfsi_model = rfsi(
+  formula = fo,
+  data = temperature,
+  n.obs = 5, # number of nearest observations
+  cpus = parallel::detectCores() - 1,
+  progress = FALSE,
+  importance = "impurity",
+  seed = 42,
+  num.trees = 250,
+  mtry = 5
+)
+rfsi_model
+```
+
+The outcome of this function is a standard `ranger` object.
+
+Another function, `cv.rfsi()`, allows for spatial (leave-location-out) cross-validation of the RFSI model.
+It requires the formula, the data, the tuning grid, the type of cross-validation, the number of folds, and few other arguments.
+The `tgrid` argument is a data frame with the tuning parameters to be tested that may include `mtry`, `num.trees`, `n.obs`, and `sample.fraction`.
+Here, we will only tune the `mtry` parameter.
+
+```{r}
+#| message: false
+#| warning: false
+rfsi_model_cv = cv.rfsi(formula = fo, 
+                   data = temperature,
+                   tgrid = expand.grid(mtry = 3:22),
+                   tune.type = "LLO", # Leave-Location-Out CV
+                   k = 5, # number of folds
+                   seed = 42,
+                   acc.metric = "RMSE", # R2, CCC, MAE
+                   output.format = "sf", # "data.frame", # "SpatVector",
+                   cpus = parallel::detectCores() - 1,
+                   progress = FALSE,
+                   importance = "impurity") # ranger parameter
+rfsi_model_cv
+acc.metric.fun(rfsi_model_cv$obs, rfsi_model_cv$pred, "RMSE")
+```
+
+The result is an object of the desired output format (here, a `sf` object) with the observed and predicted values.
+The `acc.metric.fun()` function can be then use to calculate the accuracy metric (here, RMSE) between the observed and predicted values.
+
+Finally, we can use the `pred.rfsi()` function to predict the model on new data, with a selected output format (here, `SpatRaster`).
+
+```{r}
+# Prediction on new data
+rfsi_prediction = pred.rfsi(
+  model = rfsi_model,
+  data = temperature,
+  obs.col = "temp",
+  newdata = covariates,
+  output.format = "SpatRaster", # "sf", # "SpatVector"
+  cpus = parallel::detectCores() - 1,
+  progress = FALSE
+)
+terra::plot(rfsi_prediction)
+```
+
+# SpatialML
+
+SpatialML implements a spatial extension of the random forest algorithm (Georganos et al. (2019) <doi:10.1080/10106049.2019.1595177>) based on the **randomForest**, **ranger**, and **caret** packages.
+This extension is called Geographical Random Forest (GRF).
+It extends traditional Random Forest by incorporating spatial heterogeneity through local sub-models, where each data point is used to train a localized RF using nearby observations, controlled by an adaptive kernel. 
+
+This package is not described in details here (nor the code is run) as it is aimed at predictions of rather small datasets (e.g., administrative polygons) -- the prediction of the example data takes a long time (~45 minutes).
+
+```{r}
+#| eval: false
+library(SpatialML)
+```
+
+```{r}
+#| eval: false
+coordinates = sf::st_coordinates(temperature)
+temperature_df = sf::st_drop_geometry(temperature)
+
+# define formula
+response_name = "temp"
+covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+fo = as.formula(paste(response_name, "~", paste(covariate_names, collapse = " + ")))
+
+sml = grf(fo, 
+          dframe = temperature_df, 
+          bw = 8, 
+          kernel = "adaptive", 
+          coords = coordinates)
+```
+
+```{r}
+#| eval: false
+# 1
+covariates_df = terra::as.data.frame(covariates)
+covariates_df = na.omit(covariates_df)
+sml_prediction = predict.grf(sml, covariates_df, x.var.name = "X", y.var.name = "Y")
+
+# 2
+system.time({sml_prediction = terra::predict(covariates, sml, fun = predict.grf,
+                                             x.var.name = "X", y.var.name = "Y",
+                                             na.rm = TRUE)})
+```
+
+
