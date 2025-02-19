@@ -85,6 +85,9 @@ The individual packages also have their own documentation pages. There you will 
 
 
 ```{r mlr3-essential}
+#| message: false
+#| warning: false
+
 library(mlr3verse)
 library(mlr3spatial)
 library(mlr3viz)
@@ -249,9 +252,17 @@ autoplot(tuning_blockcv, type = "parallel")
 
 Because we set `store_benchmark_result = TRUE` and `store_models = TRUE`, we also have a `archive` where all the other results are stored.
 
+
+::: {.callout-tip collapse="true"}
+## Tuning Archive
+
 ```{r spatial-cv-archive}
 tuning_blockcv$archive$data
 ```
+
+:::
+
+
 
 ### Final model with optimized hyperparameter
 
@@ -288,6 +299,9 @@ First we have to define the feature selection strategy with `fs()`. I use a lear
 
 
 ```{r ffs}
+#| warning: false
+#| message: false
+
 library(mlr3fselect)
 library(mlr3filters)
 
@@ -307,11 +321,15 @@ feature_selection = fselect(
   learner = fs_rfmodel,
   resampling = resampling_blockcv,
   measure = measure_rmse)
+```
 
 
-feature_selection$result
+```{r ffs-results}
+# selected variables
 feature_selection$result_feature_set
 
+# CV RMSE with the selected variables
+feature_selection$result$regr.rmse 
 ```
 
 
