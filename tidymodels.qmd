@@ -1,17 +1,29 @@
 ---
 title: "Spatial Machine Learning with Tidymodels"
-format: html
-editor: visual
-editor_options: 
-  chunk_output_type: console
+author: "Hanna Meyer"
+date: last-modified
+date-format: "[Last Updated:] MMMM, YYYY"
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+    code-tools: true
+    fig-column: page
+    fig-width: 10 
+    fig-height: 6.5
+    embed-resources: true
+    toc: true
+    number-sections: true
+knitr:
+  opts_chunk: 
+    warnings: false
+execute: 
+  warning: false
 ---
 
 ## Introduction
 
-
-
 ## Prepare data
-
 
 ```{r, results='hide', message=FALSE}
 library(terra)
@@ -20,27 +32,27 @@ library(tidymodels)
 library(ranger)
 library(dplyr)
 library(spatialsample)
-
 ```
 
 Read data:
+
 ```{r, results='hide', message=FALSE}
 trainingdata <- st_read("data/temp_train.gpkg")
 predictors <- rast("data/predictors.tif")
 ```
+
 Prepare data:
+
 ```{r, results='hide', message=FALSE}
 trainDat <- st_as_sf(terra::extract(predictors,trainingdata,bind=TRUE))
 predictor_names <- names(predictors)# Extract predictor names from the raster
 response_name <- "temp"
 ```
 
-
-
 ## A simple model training and prediction
 
-
 First, we train a random forest model.
+
 ```{r}
 train_df <- st_drop_geometry(trainDat)
 
@@ -49,9 +61,8 @@ formula <- as.formula(paste(response_name, "~", paste(predictor_names, collapse 
 recipe <- recipe(formula, data = train_df)
 
 rf_model <- rand_forest(trees = 100, mode = "regression",
-                        mtry = tune(),
-                        trees = 1000,
-                        min_n = tune()) %>%
+                        # mtry = tune(), min_n = tune()
+                        ) %>%
   set_engine("ranger")
 
 # Create the workflow
@@ -63,8 +74,8 @@ workflow <- workflow() %>%
 rf_fit <- fit(workflow, data = train_df)
 ```
 
+Now let's use the model for spatial prediction
 
- Now let's use the model for spatial prediction
 ```{r}
 
 # Convert raster to a data frame for prediction
@@ -80,15 +91,14 @@ predictor_df$predictions <- predictions$.pred
 prediction_raster <- rast(predictor_df, type = "xyz")$predictions
 ```
 
-
-::: {.callout-note}
+::: callout-note
 tidymodels apparently doesn't support working with raster data (neither stars nor terra supported). Detours are required for spatial predictions.
 :::
-
 
 ## Spatial cross-validation
 
 Define folds and the validation control
+
 ```{r}
 random_folds <- vfold_cv(trainDat,v=4)
 block_folds <- spatial_block_cv(trainDat, v = 4,n=2)
@@ -123,19 +133,15 @@ pred_cv %>%
   ylab("Predicted")
 ```
 
-
-::: {.callout-note}
-Similar to caret, we first define folds and a definition of train control.
-Cross-validation via fit_resamples.
-The final model, however, is still stored in workflow.
+::: callout-note
+Similar to caret, we first define folds and a definition of train control. Cross-validation via fit_resamples. The final model, however, is still stored in workflow.
 :::
 
 ## Model tuning: spatial hyperparameter tuning and variable selection
+
 ```{r}
 
 
 ```
-
-
 
 ## Area of Applicability, Uncertainties etc

@@ -1,8 +1,24 @@
 ---
 title: "Spatial modelling with caret"
 author: "Jan Linnenbrink"
-format: html
-editor: source
+date: last-modified
+date-format: "[Last Updated:] MMMM, YYYY"
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+    code-tools: true
+    fig-column: page
+    fig-width: 10 
+    fig-height: 6.5
+    embed-resources: true
+    toc: true
+    number-sections: true
+knitr:
+  opts_chunk: 
+    warnings: false
+execute: 
+  warning: false
 ---
 
 ## Intro
