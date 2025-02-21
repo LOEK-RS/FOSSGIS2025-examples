@@ -1,0 +1,17 @@
+---
+title: An Inventory of Spatial Machine Learning Packages in R
+format:
+  poster-typst: 
+    size: "33x47"
+    poster-authors: "Jakub Nowosad, Hanna Meyer, Jan Linnenbrink, Marvin Ludwig"
+    departments: "Institute of Landscape Ecology, University of Münster"
+    institution-logo: "./images/logo-remotesenising-en.png"
+    footer-text: "FOSSGIS-Konferenz"
+    footer-url: "https://github.com/LOEK-RS/FOSSGIS2025-examples"
+    footer-emails: "nowosad.jakub@gmail.com"
+    footer-color: "a5d14b"
+    keywords: ["Feature Engineering", "Spatial Dependence", "Model Validation", "Cross-Validation", "Interpretation"]
+    columns: 3
+---
+
+
