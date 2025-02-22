@@ -21,16 +21,11 @@ execute:
   warning: false
 ---
 
-
-
-
 ## Aims of this post
 
 I want to give a minimal example on how to use `mlr3` for a spatial prediction task. We want to get from measurements of temperature at specific locations in Spain to a spatially continuous map of temperature for all of Spain. 
 
 Such a spatial prediction task is often done by applying machine learning algorithms that are not necessarily developed for spatial tasks specifically and hence do not consider problems we might encounter in the spatial world, e.g. spatial autocorrelation or map extrapolation. In the last decade, a lot of methodological developments were made by various research groups to consider and deal with such specialties of spatial mapping. Many of which found their way in software packages such as `mlr3`.
-
-
 
 ## Setup
 
@@ -42,14 +37,12 @@ install.packages("sf")
 install.packages("terra")
 ```
 
-
 ```{r other-packages}
 #| message: false
 #| warning: false
 library(sf)
 library(terra)
 ```
-
 
 ### Casestudy data
 
