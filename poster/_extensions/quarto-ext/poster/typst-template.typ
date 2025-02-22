@@ -40,19 +40,19 @@
   keywords: (),
 
   // Number of columns in the poster.
-  num_columns: "3",
+  num_columns: "2",
 
   // University logo's scale (in %).
   univ_logo_scale: "100",
 
   // University logo's column size (in in).
-  univ_logo_column_size: "10",
+  univ_logo_column_size: "6",
 
   // Title and authors' column size (in in).
-  title_column_size: "20",
+  title_column_size: "24",
 
   // Poster title's font size (in pt).
-  title_font_size: "48",
+  title_font_size: "72",
 
   // Authors' font size (in pt).
   authors_font_size: "36",
@@ -169,7 +169,7 @@
       image(univ_logo, width: univ_logo_scale),
       text(title_font_size, title + "\n\n") + 
       text(authors_font_size, emph(authors) + 
-          "   (" + departments + ") "),
+          "\n" + "   " + departments + " "),
     )
   )
 
