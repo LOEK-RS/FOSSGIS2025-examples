@@ -1,0 +1,170 @@
+---
+title: An Inventory of Spatial Machine Learning Packages in R
+format:
+  poster-typst: 
+    size: "33x46"
+    poster-authors: "Jakub Nowosad, Hanna Meyer, Jan Linnenbrink, Marvin Ludwig"
+    departments: "Institute of Landscape Ecology, University of Münster"
+    institution-logo: "./images/logo-remotesenising-en.png"
+    footer-text: "FOSSGIS-Konferenz"
+    footer-url: "https://github.com/LOEK-RS/FOSSGIS2025-examples"
+    footer-emails: "Contact: nowosad.jakub@gmail.com"
+    footer-color: "a5d14b"
+    keywords: ["Spatial Autocorrelation", "Feature Engineering", "Model Tuning", "Cross-Validation", "Interpretation"]
+    columns: 2
+execute: 
+  echo: false
+knitr:
+  opts_chunk: 
+    message: false
+---
+
+<!-- quarto use template quarto-ext/typst-templates/poster -->
+
+# Introduction
+
+Machine learning techniques are widely used for both spatial and non-spatial problems.
+As the use of machine learning models for creating maps continues to grow, several challenges have emerged that are unique to spatial problems and not encountered in non-spatial applications.
+Most importantly, spatial dependence poses significant challenges, requiring careful consideration to avoid overfitting and biased outcomes.
+
+The effectiveness of machine learning models greatly hinges on the quality of input predictor data, underscoring the significance of feature engineering in the modeling process. 
+<!-- Various approaches have been proposed to integrate spatial information into machine learning: spatial coordinates of the observations, oblique geographic coordinates, Euclidean distance fields (EDF), texture information, between-object information, spatial lags, and eigenvector spatial filtering (ESF). -->
+Various approaches have been proposed to integrate spatial information into machine learning, including spatial coordinates of the observations, Euclidean distance fields (EDF), etc.
+Moreover, several modifications to traditional machine learning algorithms, such as RFGLS and hybrid models, have been suggested to improve the predictive performance of spatial data modeling. 
+Regardless of the selected modeling algorithm, a proper validation approach is crucial for choosing suitable variables and hyperparameters during the tuning process and quantifying the quality of final predictions. 
+Standard cross-validation (CV) methods tend to overestimate model transferability in spatial data, and spatial cross-validation methods, such as spatial block k-fold CV and nearest neighbor distance matching LOO CV, have been proposed to address this issue by preserving the spatial structure of data subsets. 
+Finally, spatial data models require specific tools for model interpretation and visualization, such as area of applicability (AoA), to provide insights into the model's quality and decision-making process.
+
+This poster provides an overview of spatial machine learning packages currently available in R, categorizing them based on their functionalities and applicability in spatial data analysis.
+<!-- We will not only focus on spatial extensions of three main machine learning frameworks in R (CAST for caret3, mlr3spatiotempcv for mlr3, and spatialsample for tidymodels) but also introduce specialized spatial machine learning packages for feature engineering, model validation, and interpretation, including SpatialML, RandomForestsGLS, and sits. -->
+<!-- The poster will not only serve as a navigational guide for comparing spatial machine-learning tools but also critically assess their strengths, limitations, and potential integration strategies. -->
+
+<!-- - Terminology (glossary) table -->
+
+```{r}
+source("glossary-creator.R")
+library(tinytable)
+library(dplyr)
+tt(glossary)
+```
+
+# Spatial machine learning workflow
+
+<!-- workflow figure -->
+<!-- the one below is just a placehoder for more ideas -->
+
+```{mermaid}
+graph TD;
+    A[Data Processing] --> B[Hyperparameter Tuning & Feature Selection];
+    B --> C[Model Specification];
+    C --> D[Model Validation & Evaluation];
+    D --> A;
+```
+
+# Spatial machine learning packages in R
+
+```{r}
+source("pak-database.R")
+```
+
+```{r}
+sml_pak_df |>
+  select(-Framework) |>
+  tt() |>
+  style_tt(j = 1, bold = TRUE) |>
+  style_tt(j = 2, italic = TRUE) |>
+  style_tt(j = c(2, 5), align = "r") |>
+  group_tt(i = list("caret" = 1, "tidymodels" = 3, 
+                      "mlr3" = 6, "No framework" = 8)) |>
+  style_tt(i = c(1, 4, 8, 11), align = "c", background = "#a5d14b", color = "white")
+```
+
+# Data preprocessing and feature engineering
+
+# Machine learning frameworks
+
+<!-- working outside the framework comment -->
+
+## {caret}
+
+<!-- - Workflows, e.g., {caret} has one main workflow (center function) -->
+
+## {tidymodels}
+
+<!-- - {tidymodels}: many workflows of various complexity -->
+
+## {mlr3}
+
+<!-- - {mlr3} has many workflows: no crossvalidation, crossvalidation, tuning -->
+<!-- - {mlr3}: R6 object-oriented approach; storing many models; KNNDM-CV bug? -->
+
+# Spatial machine learning methods
+
+<!-- short intro paragraph -->
+
+**RandomForestsGLS** extends Random Forest with spatial modeling using a dependency-adjusted split criterion and residual kriging. 
+It offers functions for spatial estimation (`RFGLS_estimate_spatial`), mean function prediction (`RFGLS_predict`), and spatial response prediction (`RFGLS_predict_spatial`). 
+While customizable, its syntax is unintuitive, requiring specific data formatting, and differences between prediction functions may cause confusion.  
+
+**spatialRF** simplifies spatial regression modeling with Random Forest by generating spatial predictors using distance matrices, Moran’s Eigenvector Maps, and PCA. 
+Built on **ranger**, it includes tools for feature selection (`filter_spatial_predictors()`), evaluation (`rf_evaluate()`), and model tuning (`rf_tuning()`).
+However, it requires specific data formatting and the choice of spatial predictor generation and ranking methods can be complex.  
+
+**meteo** implements Random Forest Spatial Interpolation (RFSI), incorporating spatial autocorrelation through nearest observations and distances. 
+It integrates seamlessly with spatial R objects, supports cross-validation (`cv.rfsi()`), and enables flexible predictions (`pred.rfsi()`). 
+A key limitation of **meteo** is that it exclusively relies on the **ranger** package, restricting users to the Random Forest method without options for alternative modeling approaches.
+
+```{r}
+smlc_df |> 
+  select(-category) |>
+  tt()
+```
+
+# Spatial hyperparameter tuning and validation
+
+**sperrorest** supports various partitioning methods like k-means and disc-based approaches, providing detailed evaluation metrics. 
+At the same time, users must define custom prediction functions, adding complexity, and some methods require careful tuning.
+
+**blockCV** offers cross-validation   for spatial data, including block, spatial, and environmental clustering.
+It supports flexible fold assignment and visualization (`cv_plot()`). 
+While it aids partitioning, it does not fit models, requiring users to handle tuning (e.g., block size) and ensuring clustering aligns with data structure.
+
+```{r}
+shtv_df |> 
+  select(-category) |>
+  tt()
+```
+
+# Model interpretation and visualization
+
+```{r}
+miv_df |> 
+  select(-category) |>
+  tt()
+```
+
+<!-- add nice example figures from our materials -->
+
+# Summary
+
+<!-- do we need it ??? -->
+
+# Try it yourself!
+
+Reproducible examples of various spatial machine learning techniques in R are available at <https://loek-rs.github.io/FOSSGIS2025-examples/> for reference and exploration.
+
+```{r}
+#| eval: false
+library(qrcode)
+code = qr_code("https://loek-rs.github.io/FOSSGIS2025-examples/")
+plot(code)
+```
+
+## Acknowledgements {.unnumbered}
+
+This project has received the financial support of the European Union’s Horizon Europe research and innovation programme under the Marie Skłodowska-Curie grant agreement No. 101147446.
+
+```{r}
+knitr::include_graphics("images/EN-Funded by the EU-POS.jpg")
+```
+

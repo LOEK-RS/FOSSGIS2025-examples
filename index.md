@@ -1,4 +1,4 @@
-# Comparison of spatial machine learning packages in R
+# An Inventory of Spatial Machine Learning Packages in R: examples
 
 1. [The **caret** framework](caret.html)
 2. [The **mlr3** framework](mlr3.html)
