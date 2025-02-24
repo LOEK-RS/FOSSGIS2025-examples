@@ -19,7 +19,10 @@ knitr:
     message: false
 ---
 
+<!-- install: -->
 <!-- quarto use template quarto-ext/typst-templates/poster -->
+<!-- render: -->
+<!-- QUARTO_CHROMIUM_HEADLESS_MODE=new quarto preview poster/poster.qmd --to poster-typst  -->
 
 # Introduction
 
