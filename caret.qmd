@@ -5,8 +5,8 @@ date: last-modified
 date-format: "[Last Updated:] MMMM, YYYY"
 format:
   html:
-    code-fold: true
-    code-summary: "Show the code"
+    code-fold: show
+    code-summary: "Hide the code"
     code-tools: true
     fig-column: page
     fig-width: 10 
@@ -34,6 +34,7 @@ execute:
   - book: <http://appliedpredictivemodeling.com/>
 
 ## Load libraries
+
 ``` {r}
 #| message: false
 #| warning: false
