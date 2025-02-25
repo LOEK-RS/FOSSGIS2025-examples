@@ -1,9 +1,24 @@
 ---
 title: "Spatial Machine Learning with Tidymodels"
-format: html
-editor: visual
-editor_options: 
-  chunk_output_type: console
+author: "Hanna Meyer"
+date: last-modified
+date-format: "[Last Updated:] MMMM, YYYY"
+format:
+  html:
+    code-fold: show
+    code-summary: "Hide the code"
+    code-tools: true
+    fig-column: page
+    fig-width: 10 
+    fig-height: 6.5
+    embed-resources: true
+    toc: true
+    number-sections: true
+knitr:
+  opts_chunk: 
+    warnings: false
+execute: 
+  warning: false
 ---
 
 ## Introduction
@@ -19,7 +34,6 @@ library(dplyr)
 library(spatialsample)
 library(waywiser)
 library(vip)
-
 ```
 
 Read data:
@@ -51,12 +65,12 @@ First, we train a random forest model.
 formula <- as.formula(paste(response_name, "~", paste(predictor_names, collapse = " + ")))
 recipe <- recipes::recipe(formula, data = trainDat)
 
-rf_model <- parsnip::rand_forest(trees = 100, mode = "regression") %>%
+rf_model <- parsnip::rand_forest(trees = 100, mode = "regression") |>
   set_engine("ranger",importance = "impurity")
 
 # Create the workflow
-workflow <- workflows::workflow() %>%
-  workflows::add_recipe(recipe) %>%
+workflow <- workflows::workflow() |>
+  workflows::add_recipe(recipe) |>
   workflows::add_model(rf_model)
 
 # Fit the model
@@ -100,7 +114,7 @@ tune::collect_metrics(rf_random)
 rf_spatial_pred <- data.frame(tune::collect_predictions(rf_spatial),type="spatial")
 rf_random_pred <- data.frame(tune::collect_predictions(rf_random),type="random")
 pred_cv <- rbind(rf_spatial_pred,rf_random_pred)
-pred_cv %>% 
+pred_cv |> 
   ggplot(aes(x = temp, y = .pred)) + 
   facet_wrap("type")+
   geom_point(alpha = .15) +
@@ -118,10 +132,11 @@ Similar to caret, we first define folds and a definition of train control. Cross
 ### Hyperparameter tuning
 
 we change the worfkflow to include the tuning specifications
+
 ```{r}
 #mark two parameters for tuning:
 rf_model <- parsnip::rand_forest(trees = 100, mode = "regression",
-                                 mtry = tune(), min_n = tune())%>%
+                                 mtry = tune(), min_n = tune())|>
   set_engine("ranger",importance = "impurity")
 
 
@@ -145,13 +160,14 @@ rf_tuning <- tune_grid(
 ```
 
 Analyze tuning results
+
 ```{r}
-rf_tuning %>% 
+rf_tuning |> 
   collect_metrics()
 
-rf_tuning %>%
-  collect_metrics() %>%
-  mutate(min_n = factor(min_n)) %>%
+rf_tuning |>
+  collect_metrics() |>
+  mutate(min_n = factor(min_n)) |>
   ggplot(aes(mtry, mean, color = min_n)) +
   geom_line(linewidth = 1.5, alpha = 0.6) +
   geom_point(size = 2) +
@@ -161,22 +177,23 @@ rf_tuning %>%
 ```
 
 Use tuned model for prediction
+
 ```{r}
 finalmodel <- fit_best(rf_tuning)
 finalmodel
-imp <-  extract_fit_parsnip(finalmodel) %>% 
+imp <-  extract_fit_parsnip(finalmodel) |> 
   vip::vip()
 imp
 terra::predict(predictors,finalmodel)
 ```
 
 ### Feature selection
-still missing
-https://stevenpawley.github.io/recipeselectors/
+
+Still missing: https://stevenpawley.github.io/recipeselectors/
 
 ## Area of Applicability, Uncertainties etc
-https://applicable.tidymodels.org/
-https://docs.ropensci.org/waywiser/
+
+https://applicable.tidymodels.org/ https://docs.ropensci.org/waywiser/
 
 ```{r}
 model_aoa <- waywiser::ww_area_of_applicability(
