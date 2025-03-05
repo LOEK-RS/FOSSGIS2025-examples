@@ -24,3 +24,11 @@ If you use this work, please cite it as:
 ## License
 
 <!--placeholder-->
+
+## Acknowledgements
+
+This project has received the financial support of the European Union’s Horizon Europe research and innovation programme under the Marie Skłodowska-Curie grant agreement No. 101147446.
+
+```{r}
+knitr::include_graphics("poster/images/EN-Funded by the EU-POS.jpg")
+```
