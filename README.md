@@ -29,6 +29,4 @@ If you use this work, please cite it as:
 
 This project has received the financial support of the European Union’s Horizon Europe research and innovation programme under the Marie Skłodowska-Curie grant agreement No. 101147446.
 
-```{r}
-knitr::include_graphics("poster/images/EN-Funded by the EU-POS.jpg")
-```
+![](poster/images/EN-Funded%20by%20the%20EU-POS.jpg)
