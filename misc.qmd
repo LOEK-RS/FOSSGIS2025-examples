@@ -1,34 +1,16 @@
 ---
-title: "Misc"
+title: "Miscellaneous Spatial Machine Learning Packages in R"
 author: "Jakub Nowosad"
-date: last-modified
-date-format: "[Last Updated:] MMMM, YYYY"
-format:
-  html:
-    code-fold: show
-    code-summary: "Hide the code"
-    code-tools: true
-    fig-column: page
-    fig-width: 10 
-    fig-height: 6.5
-    embed-resources: true
-    toc: true
-    number-sections: true
-knitr:
-  opts_chunk: 
-    warnings: false
-execute: 
-  warning: false
 ---
 
 ```{r misc-1 }
 #| message: false
 #| warning: false
-spain = sf::read_sf("data/spain.gpkg")
-covariates = terra::rast("data/predictors.tif")
-temperature = sf::read_sf("data/temp_train.gpkg")
+spain <- sf::read_sf("data/spain.gpkg")
+covariates <- terra::rast("data/predictors.tif")
+temperature <- sf::read_sf("data/temp_train.gpkg")
 
-temperature = terra::extract(covariates, temperature, bind = TRUE) |>
+temperature <- terra::extract(covariates, temperature, bind = TRUE) |>
     sf::st_as_sf()
 ```
 
@@ -56,26 +38,26 @@ In the example below, I limited the covariate matrix to the variables that are n
 ```{r misc-2 }
 library(RandomForestsGLS)
 
-coords = sf::st_coordinates(temperature)
-temp_response = temperature$temp
+coords <- sf::st_coordinates(temperature)
+temp_response <- temperature$temp
 
-temperature_df = sf::st_drop_geometry(temperature)
-covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-covariate_matrix = as.matrix(temperature_df[, covariate_names])
+temperature_df <- sf::st_drop_geometry(temperature)
+covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+covariate_matrix <- as.matrix(temperature_df[, covariate_names])
 ```
 
 For the example, we also split the data into training and testing sets based on created random indices.
 
 ```{r misc-3}
 set.seed(2025 - 01 - 30)
-train_idx = sample(1:nrow(coords), floor(nrow(coords) * 0.7))
+train_idx <- sample(1:nrow(coords), floor(nrow(coords) * 0.7))
 ```
 
 The `RFGLS_estimate_spatial()` function is used to fit the RF-GLS model.
 Here, we customize the number of trees to 100, but the function has many other parameters that can be adjusted.
 
 ```{r misc-4}
-estimation_result = RFGLS_estimate_spatial(
+estimation_result <- RFGLS_estimate_spatial(
     coords = coords[train_idx, ],
     y = temp_response[train_idx],
     X = covariate_matrix[train_idx, ],
@@ -94,11 +76,11 @@ Just note that the predictions by the `RFGLS_predict()` are named `"predicted"` 
 
 ```{r misc-5}
 #| warnings: false
-prediction_result = RFGLS_predict(
+prediction_result <- RFGLS_predict(
     RFGLS_out = estimation_result,
     Xtest = covariate_matrix[-train_idx, ]
 )
-prediction_result_spatial = RFGLS_predict_spatial(
+prediction_result_spatial <- RFGLS_predict_spatial(
     RFGLS_out = estimation_result,
     coords.0 = coords[-train_idx, ],
     Xtest = covariate_matrix[-train_idx, ]
@@ -111,18 +93,18 @@ The final results of these two approaches are v. similar, but not identical.
 Now, let's predict the models' results on the whole dataset.
 
 ```{r misc-6}
-covariate_coords_r = terra::crds(covariates)
-covariate_matrix_r = as.matrix(covariates)
-covariate_matrix_r = covariate_matrix_r[, covariate_names]
+covariate_coords_r <- terra::crds(covariates)
+covariate_matrix_r <- as.matrix(covariates)
+covariate_matrix_r <- covariate_matrix_r[, covariate_names]
 
-pred_s = RFGLS_predict_spatial(
+pred_s <- RFGLS_predict_spatial(
     RFGLS_out = estimation_result,
     coords.0 = covariate_coords_r,
     Xtest = covariate_matrix_r
 )
 
-pred_r = terra::setValues(covariates[[1]], pred_s$prediction)
-names(pred_r) = "prediction"
+pred_r <- terra::setValues(covariates[[1]], pred_s$prediction)
+names(pred_r) <- "prediction"
 terra::plot(pred_r)
 ```
 
@@ -140,22 +122,22 @@ We need to provide the data as a data frame with the dependent variable, includi
 library(spatialRF)
 library(sf)
 
-coordinates = st_coordinates(temperature)
-colnames(coordinates) = c("x", "y")
-coordinates = as.data.frame(coordinates)
+coordinates <- st_coordinates(temperature)
+colnames(coordinates) <- c("x", "y")
+coordinates <- as.data.frame(coordinates)
 
-temperature_df = st_drop_geometry(temperature)
-temperature_df$x = coordinates[, 1]
-temperature_df$y = coordinates[, 2]
+temperature_df <- st_drop_geometry(temperature)
+temperature_df$x <- coordinates[, 1]
+temperature_df$y <- coordinates[, 2]
 
-distance_matrix = as.matrix(dist(temperature_df[2:(ncol(temperature_df) - 9)]))
+distance_matrix <- as.matrix(dist(temperature_df[2:(ncol(temperature_df) - 9)]))
 ```
 
 We also need to define the dependent variable and the predictor variables.
 
 ```{r misc-8}
-response_name = "temp"
-covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 9)]
+response_name <- "temp"
+covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 9)]
 ```
 
 Finally, we can fit the models using one of the methods provided by the package.
@@ -168,7 +150,7 @@ The package has 10 methods implemented, nine of which are based on the three com
 The main function of this package is `rf_spatial()`, which fits the Random Forest model with spatial predictors.
 Here, an example using Moran's Eigenvector Maps method to generate spatial predictors, Moran's I to rank them, and sequential selection of the predictors is shown.
 ```{r misc-9}
-rf_spatial_moran = rf_spatial(
+rf_spatial_moran <- rf_spatial(
     data = temperature_df,
     dependent.variable.name = response_name,
     predictor.variable.names = covariate_names,
@@ -187,13 +169,13 @@ The **spatialRF** package also provides a set of additional functions.
 It includes a function for reducing multicollinearity in the predictors and removing redundant spatial predictors (`filter_spatial_predictors()`); or finding promising variable interactions (`the_feature_engineer()`):
 
 ```{r misc-10}
-interactions = the_feature_engineer(
+interactions <- the_feature_engineer(
     data = temperature_df,
     dependent.variable.name = response_name,
     predictor.variable.names = covariate_names,
     xy = coordinates,
-    importance.threshold = 0.50, #uses 50% best predictors
-    cor.threshold = 0.60, #max corr between interactions and predictors
+    importance.threshold = 0.50, # uses 50% best predictors
+    cor.threshold = 0.60, # max corr between interactions and predictors
     seed = 2025 - 01 - 30,
     repetitions = 100,
     verbose = TRUE
@@ -203,7 +185,7 @@ interactions = the_feature_engineer(
 The `rf_evaluate()` function allows the evaluation of the model using spatial cross-validation.
 
 ```{r misc-11}
-rf_eval = rf_evaluate(
+rf_eval <- rf_evaluate(
     model = rf_spatial_moran,
     xy = coordinates,
     repetitions = 30,
@@ -217,7 +199,7 @@ rf_eval
 
 The `rf_importance()` function allows for visualizing the variable importance of the model.
 ```{r misc-12}
-rf_imp = rf_importance(
+rf_imp <- rf_importance(
     rf_spatial_moran,
     xy = coordinates
 )
@@ -227,7 +209,7 @@ rf_imp
 The `mem()` function generates Moran Eigenvector Maps (MEM) from a distance matrix.^[`mem_multithreshold()` function allows for generating MEMs for multiple distance thresholds.]
 
 ```{r misc-13}
-mem1 = mem(distance.matrix = distance_matrix)
+mem1 <- mem(distance.matrix = distance_matrix)
 ```
 
 The package also contains a set of custom plot functions. 
@@ -243,7 +225,7 @@ A complete list of this package's functions is available at <https://blasbenito.
 The final prediction can be made using the `predict()` function from the **terra** package.
 
 ```{r misc-15}
-pred_srf = terra::predict(covariates, rf_spatial_moran)
+pred_srf <- terra::predict(covariates, rf_spatial_moran)
 terra::plot(pred_srf[[1]])
 ```
 
@@ -263,18 +245,18 @@ First, we need to prepare the data by extracting the coordinates and creating a 
 library(sperrorest)
 library(ranger)
 
-coordinates = sf::st_coordinates(temperature)
-temperature_df = sf::st_drop_geometry(temperature)
-temperature_df$x = coordinates[, 1]
-temperature_df$y = coordinates[, 2]
+coordinates <- sf::st_coordinates(temperature)
+temperature_df <- sf::st_drop_geometry(temperature)
+temperature_df$x <- coordinates[, 1]
+temperature_df$y <- coordinates[, 2]
 ```
 
 Second, we need to define the formula for the model and the prediction function.
 
 ```{r misc-17}
-response_name = "temp"
-covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-fo = as.formula(paste(
+response_name <- "temp"
+covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+fo <- as.formula(paste(
     response_name,
     "~",
     paste(covariate_names, collapse = " + ")
@@ -287,7 +269,7 @@ In this example, we use the `ranger` model, so we need to define a custom predic
 The `predict()` function from the `ranger` package returns a list with several elements, so we need to extract the predictions from this list.^[More information on the custom prediction functions is at <https://cran.r-project.org/web/packages/sperrorest/vignettes/custom-pred-and-model-functions.html>.]
 
 ```{r misc-18}
-mypred = function(object, newdata) {
+mypred <- function(object, newdata) {
     predict(object, newdata)$predictions
 }
 ```
@@ -300,7 +282,7 @@ The sampling function is used to partition the data into training and testing se
 
 ```{r misc-19}
 # Spatial cross-validation
-sp_res = sperrorest(
+sp_res <- sperrorest(
     formula = fo,
     data = temperature_df,
     coords = c("x", "y"),
@@ -323,7 +305,7 @@ We can contrast the obtained results with the non-spatial cross-validation by ch
 
 ```{r misc-21}
 # Non-spatial cross-validation
-nsp_res = sperrorest(
+nsp_res <- sperrorest(
     formula = fo,
     data = temperature_df,
     coords = c("x", "y"),
@@ -341,13 +323,13 @@ To compare both results, we can plot the RMSE values for the training and testin
 ```{r misc-22}
 library(ggplot2)
 # Extract train/test RMSE from spatial CV
-sp_train_rmse = sp_res$error_rep$train_rmse
-sp_test_rmse = sp_res$error_rep$test_rmse
+sp_train_rmse <- sp_res$error_rep$train_rmse
+sp_test_rmse <- sp_res$error_rep$test_rmse
 # Extract train/test RMSE from non-spatial CV
-nsp_train_rmse = nsp_res$error_rep$train_rmse
-nsp_test_rmse = nsp_res$error_rep$test_rmse
+nsp_train_rmse <- nsp_res$error_rep$train_rmse
+nsp_test_rmse <- nsp_res$error_rep$test_rmse
 # Build data frame
-rmse_df = data.frame(
+rmse_df <- data.frame(
     CV_Type = rep(c("Spatial", "Non-Spatial"), each = 4),
     Set = rep(c("Train", "Test"), each = 2),
     RMSE = c(sp_train_rmse, sp_test_rmse, nsp_train_rmse, nsp_test_rmse)
@@ -378,7 +360,7 @@ The block cross-validation is performed using the `cv_spatial()` function.
 It assigns blocks to the training and testing folds randomly, systematically or in a checkerboard pattern (the `selection` argument).
 
 ```{r misc-24 }
-sb1 = cv_spatial(
+sb1 <- cv_spatial(
     x = temperature,
     k = 10, # number of folds
     size = 300000, # size of the blocks in meters
@@ -405,7 +387,7 @@ cv_plot(sb1, temperature)
 Let's compare the results of the block cross-validation with systematic and checkerboard patterns.
 
 ```{r misc-27 }
-sb2 = cv_spatial(
+sb2 <- cv_spatial(
     x = temperature,
     k = 10,
     rows_cols = c(4, 6),
@@ -416,7 +398,7 @@ cv_plot(sb2, temperature)
 ```
 
 ```{r misc-28 }
-sb3 = cv_spatial(
+sb3 <- cv_spatial(
     x = temperature,
     k = 10,
     size = 300000,
@@ -431,7 +413,7 @@ The spatial similarity is based only on the clustering of the spatial coordinate
 
 ```{r misc-29 }
 set.seed(6)
-scv = cv_cluster(x = temperature, k = 10)
+scv <- cv_cluster(x = temperature, k = 10)
 cv_plot(scv, temperature)
 ```
 
@@ -439,7 +421,7 @@ The environmental clustering, on the other hand, is based on the clustering of t
 
 ```{r misc-30 }
 set.seed(6)
-ecv = cv_cluster(x = temperature, r = covariates, k = 5, scale = TRUE)
+ecv <- cv_cluster(x = temperature, r = covariates, k = 5, scale = TRUE)
 cv_plot(ecv, temperature)
 ```
 
@@ -447,7 +429,7 @@ The next cross-validation strategy is buffering LOO (also known as Spatial LOO).
 It is performed using the `cv_buffer()` function, which selects a buffer around each point  (test point) and uses the points outside the buffer as the testing set.^[This approach is a form of leave-one-out cross-validation.]
 
 ```{r misc-31 }
-bloo = cv_buffer(x = temperature, size = 300000, progress = FALSE)
+bloo <- cv_buffer(x = temperature, size = 300000, progress = FALSE)
 cv_plot(bloo, temperature, num_plots = c(1, 50, 100))
 ```
 
@@ -458,7 +440,7 @@ It is performed using the `cv_nndm()` function, which tries to match the nearest
 Thus, in this base, we need to provide more arguments, including a raster with the covariates, the number of samples, the sampling strategy, and the minimum training size.
 
 ```{r misc-32 }
-nncv = cv_nndm(
+nncv <- cv_nndm(
     x = temperature,
     r = covariates,
     size = 300000,
@@ -474,25 +456,25 @@ Let's now use the block cross-validation to fit and evaluate a model.
 
 ```{r misc-33}
 # define formula
-response_name = "temp"
-covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-fo = as.formula(paste(
+response_name <- "temp"
+covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+fo <- as.formula(paste(
     response_name,
     "~",
     paste(covariate_names, collapse = " + ")
 ))
 
 # extract the folds
-folds = sb1$folds_list
+folds <- sb1$folds_list
 
-model_rmse = data.frame(fold = seq_along(folds), rmse = rep(NA, length(folds)))
+model_rmse <- data.frame(fold = seq_along(folds), rmse = rep(NA, length(folds)))
 
 for (k in seq_along(folds)) {
-    trainSet = unlist(folds[[k]][1]) # training set indices; first element
-    testSet = unlist(folds[[k]][2]) # testing set indices; second element
-    rf = ranger(fo, temperature_df[trainSet, ], num.trees = 100) # model fitting on training set
-    pred = predict(rf, temperature_df[testSet, ])$predictions # predict the test set
-    model_rmse[k, "rmse"] = sqrt(mean(
+    trainSet <- unlist(folds[[k]][1]) # training set indices; first element
+    testSet <- unlist(folds[[k]][2]) # testing set indices; second element
+    rf <- ranger(fo, temperature_df[trainSet, ], num.trees = 100) # model fitting on training set
+    pred <- predict(rf, temperature_df[testSet, ])$predictions # predict the test set
+    model_rmse[k, "rmse"] <- sqrt(mean(
         (temperature_df[testSet, response_name] - pred)^2
     )) # calculate RMSE
 }
@@ -541,9 +523,9 @@ This package allows to directly work with spatial R objects.
 First, we need to define our formula.
 
 ```{r}
-response_name = "temp"
-covariate_names = colnames(temperature)[2:(ncol(temperature) - 8)]
-fo = as.formula(paste(
+response_name <- "temp"
+covariate_names <- colnames(temperature)[2:(ncol(temperature) - 8)]
+fo <- as.formula(paste(
     response_name,
     "~",
     paste(covariate_names, collapse = " + ")
@@ -555,7 +537,7 @@ The function requires the formula, the data, and the number of nearest observati
 Additional arguments can be set, including the number of CPUs to use, the progress bar, and arguments passed to the **ranger** function, such as `seed`, `num.trees`, and `mtry`.
 
 ```{r}
-rfsi_model = rfsi(
+rfsi_model <- rfsi(
     formula = fo,
     data = temperature,
     n.obs = 5, # number of nearest observations
@@ -579,7 +561,7 @@ Here, we will only tune the `mtry` parameter.
 ```{r}
 #| message: false
 #| warning: false
-rfsi_model_cv = cv.rfsi(
+rfsi_model_cv <- cv.rfsi(
     formula = fo,
     data = temperature,
     tgrid = expand.grid(mtry = 3:22),
@@ -603,7 +585,7 @@ Finally, we can use the `pred.rfsi()` function to predict the model on new data,
 
 ```{r}
 # Prediction on new data
-rfsi_prediction = pred.rfsi(
+rfsi_prediction <- pred.rfsi(
     model = rfsi_model,
     data = temperature,
     obs.col = "temp",
@@ -630,19 +612,19 @@ library(SpatialML)
 
 ```{r}
 #| eval: false
-coordinates = sf::st_coordinates(temperature)
-temperature_df = sf::st_drop_geometry(temperature)
+coordinates <- sf::st_coordinates(temperature)
+temperature_df <- sf::st_drop_geometry(temperature)
 
 # define formula
-response_name = "temp"
-covariate_names = colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-fo = as.formula(paste(
+response_name <- "temp"
+covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
+fo <- as.formula(paste(
     response_name,
     "~",
     paste(covariate_names, collapse = " + ")
 ))
 
-sml = grf(
+sml <- grf(
     fo,
     dframe = temperature_df,
     bw = 8,
@@ -654,9 +636,9 @@ sml = grf(
 ```{r}
 #| eval: false
 # 1
-covariates_df = terra::as.data.frame(covariates)
-covariates_df = na.omit(covariates_df)
-sml_prediction = predict.grf(
+covariates_df <- terra::as.data.frame(covariates)
+covariates_df <- na.omit(covariates_df)
+sml_prediction <- predict.grf(
     sml,
     covariates_df,
     x.var.name = "X",
@@ -665,7 +647,7 @@ sml_prediction = predict.grf(
 
 # 2
 system.time({
-    sml_prediction = terra::predict(
+    sml_prediction <- terra::predict(
         covariates,
         sml,
         fun = predict.grf,
