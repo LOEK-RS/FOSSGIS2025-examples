@@ -1,0 +1,21 @@
+project:
+  title: "default"
+
+date: last-modified
+date-format: "[Last Updated:] MMMM, YYYY"
+format:
+  html:
+    code-fold: show
+    code-summary: "Hide the code"
+    code-tools: true
+    fig-column: page
+    fig-width: 10 
+    fig-height: 6.5
+    embed-resources: true
+    toc: true
+    number-sections: true
+knitr:
+  opts_chunk: 
+    warnings: false
+execute: 
+  warning: false
