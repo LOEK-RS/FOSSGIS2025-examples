@@ -13,7 +13,8 @@ The poster is accompanied by code examples that demonstrate how to use these pac
 1. [The **caret** framework](caret.html)
 2. [The **mlr3** framework](mlr3.html)
 3. [The **tidymodels** framework](tidymodels.html)
-4. [Other packages](misc.html)
+4. [Miscellaneous spatial cross-validation packages in R](misc_scv.html)
+5. [Miscellaneous spatial machine learning methods' packages in R](misc_sml.html)
 
 ## Citation
 
