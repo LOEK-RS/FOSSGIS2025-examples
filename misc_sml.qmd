@@ -1,9 +1,13 @@
 ---
-title: "Miscellaneous Spatial Machine Learning Packages in R"
+title: "Miscellaneous spatial machine learning methods' packages in R"
 author: "Jakub Nowosad"
 ---
 
-```{r misc-1 }
+This document provides an overview of three R packages, **RandomForestsGLS**, **spatialRF**, and **meteo**, that implement spatial machine learning methods, but are outside of standard machine learning frameworks like **caret**, **tidymodels**, or **mlr3**.
+
+All of the examples below use the same dataset, which includes the temperature measurements in Spain, a set of covariates, and the spatial coordinates of the temperature measurements.
+
+```{r misc-sml-1 }
 #| message: false
 #| warning: false
 spain <- sf::read_sf("data/spain.gpkg")
@@ -35,7 +39,7 @@ The package has rather unintuitive syntax and requires the data to be in a speci
 We need to provide the coordinates of the data (a matrix), the response variable (a vector), and the covariates (a matrix).
 In the example below, I limited the covariate matrix to the variables that are not spatial proxies.
 
-```{r misc-2 }
+```{r misc-sml-2 }
 library(RandomForestsGLS)
 
 coords <- sf::st_coordinates(temperature)
@@ -48,7 +52,7 @@ covariate_matrix <- as.matrix(temperature_df[, covariate_names])
 
 For the example, we also split the data into training and testing sets based on created random indices.
 
-```{r misc-3}
+```{r misc-sml-3 }
 set.seed(2025 - 01 - 30)
 train_idx <- sample(1:nrow(coords), floor(nrow(coords) * 0.7))
 ```
@@ -56,7 +60,7 @@ train_idx <- sample(1:nrow(coords), floor(nrow(coords) * 0.7))
 The `RFGLS_estimate_spatial()` function is used to fit the RF-GLS model.
 Here, we customize the number of trees to 100, but the function has many other parameters that can be adjusted.
 
-```{r misc-4}
+```{r misc-sml-4 }
 estimation_result <- RFGLS_estimate_spatial(
     coords = coords[train_idx, ],
     y = temp_response[train_idx],
@@ -74,7 +78,7 @@ The difference (as far as I understand) is that the former returns the mean pred
 The first function returns a list with two elements: a matrix of predictions (ntest x ntree) and a vector of predicted values, while the second function returns a list with just one element: a vector of predicted values.
 Just note that the predictions by the `RFGLS_predict()` are named `"predicted"` and the predictions by the `RFGLS_predict_spatial()` are named `"prediction"`.
 
-```{r misc-5}
+```{r misc-sml-5 }
 #| warnings: false
 prediction_result <- RFGLS_predict(
     RFGLS_out = estimation_result,
@@ -92,7 +96,7 @@ The final results of these two approaches are v. similar, but not identical.
 
 Now, let's predict the models' results on the whole dataset.
 
-```{r misc-6}
+```{r misc-sml-6 }
 covariate_coords_r <- terra::crds(covariates)
 covariate_matrix_r <- as.matrix(covariates)
 covariate_matrix_r <- covariate_matrix_r[, covariate_names]
@@ -115,10 +119,9 @@ The internal calculations are based on three general methods to generate spatial
 The **ranger** package is used here internally to fit the Random Forest model.
 
 This package also requires the data to be in a specific format.
-<!-- UPDATE!!!! -->
 We need to provide the data as a data frame with the dependent variable, including spatial coordinates, and the distance matrix: a matrix with the distances among the records in the data frame.
 
-```{r misc-7 }
+```{r misc-sml-7 }
 library(spatialRF)
 library(sf)
 
@@ -135,7 +138,7 @@ distance_matrix <- as.matrix(dist(temperature_df[2:(ncol(temperature_df) - 9)]))
 
 We also need to define the dependent variable and the predictor variables.
 
-```{r misc-8}
+```{r misc-sml-8 }
 response_name <- "temp"
 covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 9)]
 ```
@@ -149,7 +152,7 @@ The package has 10 methods implemented, nine of which are based on the three com
 
 The main function of this package is `rf_spatial()`, which fits the Random Forest model with spatial predictors.
 Here, an example using Moran's Eigenvector Maps method to generate spatial predictors, Moran's I to rank them, and sequential selection of the predictors is shown.
-```{r misc-9}
+```{r misc-sml-9 }
 rf_spatial_moran <- rf_spatial(
     data = temperature_df,
     dependent.variable.name = response_name,
@@ -168,7 +171,7 @@ Printing the model object provides a summary of the model, including its paramet
 The **spatialRF** package also provides a set of additional functions.
 It includes a function for reducing multicollinearity in the predictors and removing redundant spatial predictors (`filter_spatial_predictors()`); or finding promising variable interactions (`the_feature_engineer()`):
 
-```{r misc-10}
+```{r misc-sml-10 }
 interactions <- the_feature_engineer(
     data = temperature_df,
     dependent.variable.name = response_name,
@@ -184,7 +187,7 @@ interactions <- the_feature_engineer(
 
 The `rf_evaluate()` function allows the evaluation of the model using spatial cross-validation.
 
-```{r misc-11}
+```{r misc-sml-11 }
 rf_eval <- rf_evaluate(
     model = rf_spatial_moran,
     xy = coordinates,
@@ -198,7 +201,7 @@ rf_eval
 ```
 
 The `rf_importance()` function allows for visualizing the variable importance of the model.
-```{r misc-12}
+```{r misc-sml-12 }
 rf_imp <- rf_importance(
     rf_spatial_moran,
     xy = coordinates
@@ -208,14 +211,14 @@ rf_imp
 
 The `mem()` function generates Moran Eigenvector Maps (MEM) from a distance matrix.^[`mem_multithreshold()` function allows for generating MEMs for multiple distance thresholds.]
 
-```{r misc-13}
+```{r misc-sml-13 }
 mem1 <- mem(distance.matrix = distance_matrix)
 ```
 
 The package also contains a set of custom plot functions. 
 One example is the `plot_response_curves()` function, which allows for the visualization of the response curves of the model.
 
-```{r misc-14}
+```{r misc-sml-14 }
 plot_response_curves(rf_spatial_moran)
 ```
 
@@ -224,289 +227,10 @@ A complete list of this package's functions is available at <https://blasbenito.
 
 The final prediction can be made using the `predict()` function from the **terra** package.
 
-```{r misc-15}
+```{r misc-sml-15 }
 pred_srf <- terra::predict(covariates, rf_spatial_moran)
 terra::plot(pred_srf[[1]])
 ```
-
-# sperrorest
-
-The **sperrorest** (<https://doi.org/10.32614/CRAN.package.sperrorest>) package is designed for spatial error estimation and variable importance assessment for predictive models.
-The package itself does not fit the models but provides a set of functions for spatial cross-validation, including data partitioning and model cross-validation.
-
-While the **sperrorest** package has many functions (including a set of functions for data partitioning), its main function is `sperrorest()`.
-It performs spatial cross-validation for spatial prediction models, including variable importance assessment and prediction error estimation.
-To use this function, we need to provide the formula, the data, the coordinates, the model function, the model arguments, the prediction function, the sampling function, and the sampling arguments.
-
-Let's do it step by step.
-First, we need to prepare the data by extracting the coordinates and creating a data frame with the dependent variable, covariates, and coordinates.
-
-```{r misc-16 }
-library(sperrorest)
-library(ranger)
-
-coordinates <- sf::st_coordinates(temperature)
-temperature_df <- sf::st_drop_geometry(temperature)
-temperature_df$x <- coordinates[, 1]
-temperature_df$y <- coordinates[, 2]
-```
-
-Second, we need to define the formula for the model and the prediction function.
-
-```{r misc-17}
-response_name <- "temp"
-covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-fo <- as.formula(paste(
-    response_name,
-    "~",
-    paste(covariate_names, collapse = " + ")
-))
-```
-
-Third, we need to define the custom prediction function.
-The **sperrorest** package works with many model functions, but it requires a custom prediction function to extract the predictions from the model object.
-In this example, we use the `ranger` model, so we need to define a custom prediction function that extracts the predictions from the `ranger` model object.
-The `predict()` function from the `ranger` package returns a list with several elements, so we need to extract the predictions from this list.^[More information on the custom prediction functions is at <https://cran.r-project.org/web/packages/sperrorest/vignettes/custom-pred-and-model-functions.html>.]
-
-```{r misc-18}
-mypred <- function(object, newdata) {
-    predict(object, newdata)$predictions
-}
-```
-
-Fourth, we can perform the spatial cross-validation using the `sperrorest()` function.
-We just need to provide previously prepared data, the formula, the model function, and the prediction function.
-Moreover, we can also define some additional parameters of the model, such as the number of trees in the `ranger` model.
-Finally, the important part is to define the sampling function (`smp_fun`) and its arguments (`smp_args`).
-The sampling function is used to partition the data into training and testing sets: here, we use the `partition_kmeans()` function to partition the data spatially into folds using k-means clustering of the coordinates.^[There are several other partition functions available in the package, including `partition_disc()`, `partition_tiles()`, and  `partition_cv()`.]
-
-```{r misc-19}
-# Spatial cross-validation
-sp_res <- sperrorest(
-    formula = fo,
-    data = temperature_df,
-    coords = c("x", "y"),
-    model_fun = ranger,
-    model_args = list(num.trees = 100),
-    pred_fun = mypred,
-    smp_fun = partition_kmeans,
-    smp_args = list(repetition = 1:2, nfold = 3),
-    progress = FALSE
-)
-```
-
-The result is a list with several components, including the error at the repetition and fold levels, the resampling object, the variable importance (only when `importance = TRUE`), the benchmark, and the package version.
-
-```{r misc-20}
-summary(sp_res$error_rep)
-```
-
-We can contrast the obtained results with the non-spatial cross-validation by changing the sampling function to `partition_cv()`.
-
-```{r misc-21}
-# Non-spatial cross-validation
-nsp_res <- sperrorest(
-    formula = fo,
-    data = temperature_df,
-    coords = c("x", "y"),
-    model_fun = ranger,
-    model_args = list(num.trees = 100),
-    pred_fun = mypred,
-    smp_fun = partition_cv,
-    smp_args = list(repetition = 1:2, nfold = 3),
-    progress = FALSE
-)
-```
-
-To compare both results, we can plot the RMSE values for the training and testing sets of both spatial and non-spatial cross-validation.
-
-```{r misc-22}
-library(ggplot2)
-# Extract train/test RMSE from spatial CV
-sp_train_rmse <- sp_res$error_rep$train_rmse
-sp_test_rmse <- sp_res$error_rep$test_rmse
-# Extract train/test RMSE from non-spatial CV
-nsp_train_rmse <- nsp_res$error_rep$train_rmse
-nsp_test_rmse <- nsp_res$error_rep$test_rmse
-# Build data frame
-rmse_df <- data.frame(
-    CV_Type = rep(c("Spatial", "Non-Spatial"), each = 4),
-    Set = rep(c("Train", "Test"), each = 2),
-    RMSE = c(sp_train_rmse, sp_test_rmse, nsp_train_rmse, nsp_test_rmse)
-)
-ggplot(rmse_df, aes(x = CV_Type, y = RMSE, fill = Set)) +
-    geom_boxplot() +
-    facet_wrap(~Set) +
-    labs(title = "RMSE Comparison", x = "CV Method", y = "RMSE")
-```
-
-The results show that the estimation using the spatial-cross validation is less optimistic than the non-spatial cross-validation for the test set.
-
-More examples of the package use can be found at <https://giscience-fsu.github.io/sperrorest/articles/spatial-modeling-use-case.html>/
-
-# blockCV
-
-The **blockCV** (<https://doi.org/10.1111/2041-210X.13107>) package provides a set of functions for block cross-validation, spatial and environmental clustering, and spatial autocorrelation estimation.
-The package itself does not fit the models.
-
-```{r misc-23 }
-library(blockCV)
-```
-
-Cross-validation strategies separate the data into training and testing sets to evaluate the model's performance.
-The **blockCV** package provides several cross-validation strategies, including block cross-validation, spatial clustering, environmental clustering, buffering LOO, and Nearest Neighbour Distance Matching (NNDM) LOO.
-
-The block cross-validation is performed using the `cv_spatial()` function.
-It assigns blocks to the training and testing folds randomly, systematically or in a checkerboard pattern (the `selection` argument).
-
-```{r misc-24 }
-sb1 <- cv_spatial(
-    x = temperature,
-    k = 10, # number of folds
-    size = 300000, # size of the blocks in meters
-    selection = "random", # random blocks-to-fold
-    iteration = 50, # find evenly dispersed folds
-    progress = FALSE,
-    biomod2 = TRUE
-)
-```
-
-The result is a list with several components, including the folds list, the folds IDs, the biomod table, the number of folds, the input size, the column name, the blocks, and the records.
-For example, we can check the structure of the folds list with the `str()` function.
-
-```{r misc-25}
-str(sb1$folds_list)
-```
-
-The `cv_plot()` function additionally allows for the visualization of cross-validation results.
-
-```{r misc-26}
-cv_plot(sb1, temperature)
-```
-
-Let's compare the results of the block cross-validation with systematic and checkerboard patterns.
-
-```{r misc-27 }
-sb2 <- cv_spatial(
-    x = temperature,
-    k = 10,
-    rows_cols = c(4, 6),
-    hexagon = FALSE,
-    selection = "systematic"
-)
-cv_plot(sb2, temperature)
-```
-
-```{r misc-28 }
-sb3 <- cv_spatial(
-    x = temperature,
-    k = 10,
-    size = 300000,
-    hexagon = FALSE,
-    selection = "checkerboard"
-)
-cv_plot(sb3, temperature)
-```
-
-The clustering strategies (`cv_cluster()`) are used to group the data into clusters based on spatial or environmental similarity.
-The spatial similarity is based only on the clustering of the spatial coordinates. 
-
-```{r misc-29 }
-set.seed(6)
-scv <- cv_cluster(x = temperature, k = 10)
-cv_plot(scv, temperature)
-```
-
-The environmental clustering, on the other hand, is based on the clustering of the values of the covariates extracted from the raster data.
-
-```{r misc-30 }
-set.seed(6)
-ecv <- cv_cluster(x = temperature, r = covariates, k = 5, scale = TRUE)
-cv_plot(ecv, temperature)
-```
-
-The next cross-validation strategy is buffering LOO (also known as Spatial LOO).
-It is performed using the `cv_buffer()` function, which selects a buffer around each point  (test point) and uses the points outside the buffer as the testing set.^[This approach is a form of leave-one-out cross-validation.]
-
-```{r misc-31 }
-bloo <- cv_buffer(x = temperature, size = 300000, progress = FALSE)
-cv_plot(bloo, temperature, num_plots = c(1, 50, 100))
-```
-
-Note that above, we plot only the first, 50th, and 100th points to avoid overplotting.
-
-The last cross-validation strategy implemented in the **blockCV** package is the Nearest Neighbour Distance Matching (NNDM) LOO.
-It is performed using the `cv_nndm()` function, which tries to match the nearest neighbor distance distribution function between the test and training data to the nearest neighbor distance distribution function between the target prediction and training points.
-Thus, in this base, we need to provide more arguments, including a raster with the covariates, the number of samples, the sampling strategy, and the minimum training size.
-
-```{r misc-32 }
-nncv <- cv_nndm(
-    x = temperature,
-    r = covariates,
-    size = 300000,
-    num_sample = 5000,
-    sampling = "regular",
-    min_train = 0.1,
-    plot = TRUE
-)
-cv_plot(nncv, temperature, num_plots = c(1, 50, 100))
-```
-
-Let's now use the block cross-validation to fit and evaluate a model.
-
-```{r misc-33}
-# define formula
-response_name <- "temp"
-covariate_names <- colnames(temperature_df)[2:(ncol(temperature_df) - 7)]
-fo <- as.formula(paste(
-    response_name,
-    "~",
-    paste(covariate_names, collapse = " + ")
-))
-
-# extract the folds
-folds <- sb1$folds_list
-
-model_rmse <- data.frame(fold = seq_along(folds), rmse = rep(NA, length(folds)))
-
-for (k in seq_along(folds)) {
-    trainSet <- unlist(folds[[k]][1]) # training set indices; first element
-    testSet <- unlist(folds[[k]][2]) # testing set indices; second element
-    rf <- ranger(fo, temperature_df[trainSet, ], num.trees = 100) # model fitting on training set
-    pred <- predict(rf, temperature_df[testSet, ])$predictions # predict the test set
-    model_rmse[k, "rmse"] <- sqrt(mean(
-        (temperature_df[testSet, response_name] - pred)^2
-    )) # calculate RMSE
-}
-model_rmse
-```
-
-The **blockCV** package also provides functions for checking the similarity between the folds (`cv_similarity()`) and estimating the effective range of spatial autocorrelation (`cv_spatial_autocor()`).
-The first function is used to check the similarity between the folds in the cross-validation.
-
-```{r misc-34 }
-cv_similarity(cv = sb1, x = temperature, r = covariates, progress = FALSE)
-```
-
-The second function is used to estimate the effective range of spatial autocorrelation of all input raster layers or the response data -- its role is to help to determine the size of the blocks in the block cross-validation.
-
-```{r misc-35 }
-cv_spatial_autocor(r = covariates, num_sample = 5000, progress = FALSE)
-```
-
-More examples of the package's use can be found at <https://cran.r-project.org/web/packages/blockCV/vignettes/tutorial_2.html>.
-
-# ENMeval
-
-<https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0-vignette.html>
-
-Out-of-scope: a focus on the occurrence records (ecological niche models/species distribution models)
-
-# sits
-
-<https://github.com/e-sensing/sits>
-
-Out-of-scope: a focus on spatiotemporal data cubes
 
 # meteo
 
@@ -515,14 +239,14 @@ RFSI enhances traditional Random Forest by explicitly incorporating spatial auto
 These covariates include (1) observations from the nn nearest locations and (2) their respective distances to the target location. 
 Predictions follow the same principle, using the nearest observed values and distances to improve spatial accuracy.
 
-```{r}
+```{r misc-sml-16}
 library(meteo)
 ```
 
 This package allows to directly work with spatial R objects.
 First, we need to define our formula.
 
-```{r}
+```{r misc-sml-17}
 response_name <- "temp"
 covariate_names <- colnames(temperature)[2:(ncol(temperature) - 8)]
 fo <- as.formula(paste(
@@ -536,7 +260,7 @@ Next, we use the main function in this package, `rfsi()`, to fit the RFSI model.
 The function requires the formula, the data, and the number of nearest observations used in the model.
 Additional arguments can be set, including the number of CPUs to use, the progress bar, and arguments passed to the **ranger** function, such as `seed`, `num.trees`, and `mtry`.
 
-```{r}
+```{r misc-sml-18}
 rfsi_model <- rfsi(
     formula = fo,
     data = temperature,
@@ -558,7 +282,7 @@ It requires the formula, the data, the tuning grid, the type of cross-validation
 The `tgrid` argument is a data frame with the tuning parameters to be tested that may include `mtry`, `num.trees`, `n.obs`, and `sample.fraction`.
 Here, we will only tune the `mtry` parameter.
 
-```{r}
+```{r misc-sml-19}
 #| message: false
 #| warning: false
 rfsi_model_cv <- cv.rfsi(
@@ -583,7 +307,7 @@ The `acc.metric.fun()` function can be then use to calculate the accuracy metric
 
 Finally, we can use the `pred.rfsi()` function to predict the model on new data, with a selected output format (here, `SpatRaster`).
 
-```{r}
+```{r misc-sml-20}
 # Prediction on new data
 rfsi_prediction <- pred.rfsi(
     model = rfsi_model,
@@ -597,7 +321,22 @@ rfsi_prediction <- pred.rfsi(
 terra::plot(rfsi_prediction)
 ```
 
-# SpatialML
+
+::: {.content-hidden}
+
+## ENMeval
+
+<https://jamiemkass.github.io/ENMeval/articles/ENMeval-2.0-vignette.html>
+
+Out-of-scope: a focus on the occurrence records (ecological niche models/species distribution models)
+
+## sits
+
+<https://github.com/e-sensing/sits>
+
+Out-of-scope: a focus on spatiotemporal data cubes
+
+## SpatialML {.}
 
 SpatialML implements a spatial extension of the random forest algorithm (Georganos et al. (2019) <doi:10.1080/10106049.2019.1595177>) based on the **randomForest**, **ranger**, and **caret** packages.
 This extension is called Geographical Random Forest (GRF).
@@ -605,12 +344,12 @@ It extends traditional Random Forest by incorporating spatial heterogeneity thro
 
 This package is not described in details here (nor the code is run) as it is aimed at predictions of rather small datasets (e.g., administrative polygons) -- the prediction of the example data takes a long time (~45 minutes).
 
-```{r}
+```{r misc-sml-21}
 #| eval: false
 library(SpatialML)
 ```
 
-```{r}
+```{r misc-sml-22}
 #| eval: false
 coordinates <- sf::st_coordinates(temperature)
 temperature_df <- sf::st_drop_geometry(temperature)
@@ -633,7 +372,7 @@ sml <- grf(
 )
 ```
 
-```{r}
+```{r misc-sml-23}
 #| eval: false
 # 1
 covariates_df <- terra::as.data.frame(covariates)
@@ -658,4 +397,4 @@ system.time({
 })
 ```
 
-
+:::
