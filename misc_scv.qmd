@@ -10,9 +10,9 @@ All of the examples below use the same dataset, which includes the temperature m
 ```{r misc-scv-1 }
 #| message: false
 #| warning: false
-spain <- sf::read_sf("data/spain.gpkg")
-covariates <- terra::rast("data/predictors.tif")
-temperature <- sf::read_sf("data/temp_train.gpkg")
+spain <- sf::read_sf("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/spain.gpkg")
+covariates <- terra::rast("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/predictors.tif")
+temperature <- sf::read_sf("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/temp_train.gpkg")
 
 temperature <- terra::extract(covariates, temperature, bind = TRUE) |>
     sf::st_as_sf()

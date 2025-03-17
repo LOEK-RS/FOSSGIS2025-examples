@@ -34,10 +34,10 @@ library(terra)
 ```{r data}
 #| message: false
 #| warning: false
-covariates <- terra::rast("data/predictors.tif")
-temperature <- sf::read_sf("data/temp_train.gpkg")
+covariates <- terra::rast("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/predictors.tif")
+temperature <- sf::read_sf("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/temp_train.gpkg")
 
-spain <- sf::read_sf("data/spain.gpkg") |>
+spain <- sf::read_sf("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/spain.gpkg") |>
     st_cast("POLYGON") |>
     st_transform(st_crs(temperature))
 

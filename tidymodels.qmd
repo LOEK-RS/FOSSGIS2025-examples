@@ -25,8 +25,8 @@ Read data:
 ```{r}
 #| results: hide
 #| message: false
-trainingdata <- sf::st_read("data/temp_train.gpkg")
-predictors <- terra::rast("data/predictors.tif")
+trainingdata <- sf::st_read("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/temp_train.gpkg")
+predictors <- terra::rast("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/predictors.tif")
 ```
 
 Prepare data:

@@ -56,11 +56,11 @@ Load data needed in this modelling example:
 ```{r}
 #| message: false
 #| warning: false
-predictor_stack <- terra::rast("data/predictors.tif")
+predictor_stack <- terra::rast("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/predictors.tif")
 predictor_names <- names(predictor_stack)
-spain <- sf::st_read("data/spain.gpkg")
+spain <- sf::st_read("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/spain.gpkg")
 
-train_points <- sf::st_read("data/temp_train.gpkg")
+train_points <- sf::st_read("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/temp_train.gpkg")
 train_data <- terra::extract(
     predictor_stack,
     train_points,
