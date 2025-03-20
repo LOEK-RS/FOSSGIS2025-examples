@@ -6,7 +6,7 @@ The poster is accompanied by code examples that demonstrate how to use these pac
 
 ## Poster
 
-<!--placeholder-->
+[![](poster/poster_lr.png)](https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/poster/poster.png)
 
 ## Code examples
 
