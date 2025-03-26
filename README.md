@@ -1,5 +1,7 @@
 # An Inventory of Spatial Machine Learning Packages in R
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15088972.svg)](https://doi.org/10.5281/zenodo.15088972)
+
 This repository contains the poster titled "An Inventory of Spatial Machine Learning Packages in R" presented at the FOSSGIS 2025 conference in Münster, Germany. 
 The poster compares the machine learning frameworks **caret**, **mlr3**, and **tidymodels** in R and their capabilities for spatial machine learning tasks, and provides an overview of other packages that can be used for spatial machine learning in R.
 The poster is accompanied by code examples that demonstrate how to use these packages for spatial machine learning tasks.
