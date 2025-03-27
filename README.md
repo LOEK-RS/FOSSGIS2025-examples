@@ -22,7 +22,7 @@ The poster is accompanied by code examples that demonstrate how to use these pac
 
 If you use this work, please cite it as:
 
-> Nowosad J., Meyer H., Linnenbrink J., Ludwig M. (2025) An Inventory of Spatial Machine Learning Packages in R. FOSSGIS 2025, Münster, Germany.
+> Nowosad J., Meyer H., Linnenbrink J., Ludwig M. (2025) An Inventory of Spatial Machine Learning Packages in R. FOSSGIS 2025, Münster, Germany. https://doi.org/10.5281/zenodo.15088972
 
 ## License
 
